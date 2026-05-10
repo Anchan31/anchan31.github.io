@@ -164,8 +164,8 @@ async function payNow(planName, amount) {
                 const verifyData = await verifyResponse.json();
 
                 if (verifyData.success) {
-                    alert('Payment Successful! Your subscription is now active.');
-                    // You can redirect to a success page here
+                    // Redirect to Success Page
+                    window.location.href = `success.html?order_id=${response.razorpay_order_id}`;
                 } else {
                     alert('Payment verification failed: ' + verifyData.message);
                 }
