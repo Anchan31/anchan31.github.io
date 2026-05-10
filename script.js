@@ -142,10 +142,10 @@ async function payNow(planName, amount) {
 
         // STEP 2: Open Razorpay Checkout Modal
         const options = {
-            "key": "rzp_test_Snn97mQxGMrkY3", // Public Key ID
+            "key": "rzp_live_SnoRpxeRfQ16QA", // Live Public Key ID
             "amount": orderData.amount,
             "currency": orderData.currency,
-            "name": "Nextgen Recruitment Suite",
+            "name": "NextgenUdaan",
             "description": `Subscription for ${planName} Plan`,
             "image": "./src/images/favicon.png",
             "order_id": orderData.order_id,
@@ -179,7 +179,7 @@ async function payNow(planName, amount) {
                 "color": "#0f172a"
             },
             "modal": {
-                "ondismiss": function() {
+                "ondismiss": function () {
                     console.log('Checkout modal closed by user');
                 }
             }
