@@ -4,662 +4,389 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chandan Kumar Singh - Senior HR Executive</title>
+    <title>Nextgen Recruitment Suite | Enterprise Talent Acquisition Ecosystem</title>
+    <meta name="description"
+        content="The high-performance hiring suite designed for modern enterprises. Streamline your recruitment with data, automation, and premium candidate experiences.">
+
+    <!-- SEO & Favicon -->
+    <link rel="icon" type="image/png" href="../recruit/app/assets/images/favicon.png">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+
+    <!-- Razorpay SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 
 <body>
-    <!-- Particle Background -->
-    <canvas id="particleCanvas"></canvas>
 
     <!-- Navigation -->
-    <nav class="navbar">
-        <div class="nav-container">
-            <div class="logo">Chandan Singh</div>
-            <ul class="nav-menu">
-                <li><a href="#home" class="nav-link">Home</a></li>
-                <li><a href="#about" class="nav-link">About</a></li>
-                <li><a href="#overview" class="nav-link">Overview</a></li>
-                <li><a href="#experience" class="nav-link">Experience</a></li>
-                <li><a href="#education" class="nav-link">Education</a></li>
-                <li><a href="#skills" class="nav-link">Skills</a></li>
-                <li><a href="#certifications" class="nav-link">Certifications</a></li>
-                <li><a href="#achievements" class="nav-link">Achievements</a></li>
-                <li><a href="#contact" class="nav-link">Contact</a></li>
-            </ul>
-            <div class="hamburger">
-                <span></span>
-                <span></span>
-                <span></span>
+    <header class="nav-bar">
+        <div class="container" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div
+                    style="width: 32px; height: 32px; background: var(--text-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-users-rays" style="color: white; font-size: 0.9rem;"></i>
+                </div>
+                <span
+                    style="font-family: var(--font-heading); font-weight: 800; font-size: 1.25rem; letter-spacing: -1px; color: var(--text-primary);">Nextgen<span
+                        style="color: var(--primary);">.</span></span>
+            </div>
+            <div style="display: flex; gap: 2.5rem; align-items: center;">
+                <a href="#suite"
+                    style="color: var(--text-secondary); text-decoration: none; font-weight: 500; font-size: 0.95rem;">The
+                    Suite</a>
+                <a href="#benefits"
+                    style="color: var(--text-secondary); text-decoration: none; font-weight: 500; font-size: 0.95rem;">Benefits</a>
+                <a href="#testimonials"
+                    style="color: var(--text-secondary); text-decoration: none; font-weight: 500; font-size: 0.95rem;">Success
+                    Stories</a>
+                <a href="#contact" class="btn btn-primary" style="padding: 0.6rem 1.5rem; font-size: 0.9rem;">Book a
+                    Demo</a>
             </div>
         </div>
-    </nav>
+    </header>
 
     <!-- Hero Section -->
-    <section id="home" class="hero">
-        <div class="hero-content">
-            <div class="hero-text">
-                <h1 class="hero-title">Chandan Kumar Singh</h1>
-                <h2 class="hero-subtitle">Senior HR Executive | Assistant Manager HR</h2>
-                <p class="hero-description">Experienced HR leader with strong capabilities in payroll, attendance management, statutory compliance, HRMS operations, and employee engagement across manufacturing and pharmaceutical environments.</p>
-                <div class="hero-buttons">
-                    <a href="#contact" class="btn btn-primary">Get In Touch</a>
-                    <a href="#about" class="btn btn-secondary">Learn More</a>
-                </div>
+    <section style="padding-top: 180px; padding-bottom: 80px;">
+        <div class="container" style="text-align: center;">
+            <div class="reveal"
+                style="display: inline-block; padding: 0.5rem 1.25rem; background: var(--primary-soft); border-radius: 100px; color: var(--primary); font-size: 0.8rem; font-weight: 700; margin-bottom: 2rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                The New Standard for Talent Teams
             </div>
-            <div class="hero-3d-container">
-                <div class="cube-container">
-                    <div class="cube">
-                        <div class="cube-face front">HR</div>
-                        <div class="cube-face back">OPS</div>
-                        <div class="cube-face right">PRO</div>
-                        <div class="cube-face left">CMP</div>
-                        <div class="cube-face top">MGT</div>
-                        <div class="cube-face bottom">Excel</div>
-                    </div>
-                </div>
+            <h1 class="reveal text-gradient" style="max-width: 900px; margin: 0 auto 2rem;">
+                Hire Smarter. Scale Faster. <br> Retain the Best.
+            </h1>
+            <p class="reveal" style="margin: 0 auto 3rem; font-size: 1.25rem; max-width: 700px;">
+                Stop fighting with fragmented tools. Nextgen is the unified ecosystem that powers high-growth
+                recruitment teams with data, automation, and elite candidate experiences.
+            </p>
+            <div class="reveal" style="display: flex; gap: 1rem; justify-content: center;">
+                <a href="#contact" class="btn btn-primary">Transform Your Hiring <i class="fas fa-chevron-right"
+                        style="margin-left: 0.75rem; font-size: 0.8rem;"></i></a>
+                <a href="#suite" class="btn btn-outline">Explore the Apps</a>
             </div>
-        </div>
-        <div class="scroll-indicator">
-            <div class="mouse">
-                <div class="wheel"></div>
-            </div>
-            <p>Scroll Down Please</p>
-        </div>
-    </section>
 
-    <!-- About Section -->
-    <section id="about" class="about">
-        <div class="container">
-            <h2 class="section-title">About Me</h2>
-            <div class="about-grid">
-                <div class="about-card summary-card">
-                    <h3>Professional Summary</h3>
-                    <p>HR generalist with 3+ years of experience managing payroll, attendance, onboarding, and compliance in high-volume manufacturing and pharmaceutical environments.</p>
-                    <p>Expertise in HRMS, E-Pay, Savior HR, Excel automation, PF/ESIC statutory compliance, and MIS reporting.</p>
-                    <p>Proven track record of standardizing HR practices across multiple locations, reducing errors, and improving reporting speed.</p>
+            <!-- Dashboard Mockup -->
+            <div class="reveal" style="margin-top: 6rem; position: relative;">
+                <div
+                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; background: radial-gradient(circle, var(--primary-soft) 0%, transparent 70%); opacity: 0.5; z-index: -1;">
                 </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
-                        <div class="stat-number" data-target="2">0</div>
-                        <div class="stat-label">Years Experience</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-building"></i></div>
-                        <div class="stat-number" data-target="2">0</div>
-                        <div class="stat-label">Companies</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-project-diagram"></i></div>
-                        <div class="stat-number" data-target="20">0</div>
-                        <div class="stat-label">Projects Completed</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon"><i class="fas fa-users"></i></div>
-                        <div class="stat-number" data-target="100">0</div>
-                        <div class="stat-label">Team Coordination</div>
-                    </div>
-                </div>
-
-                <div class="about-card strengths-card">
-                    <h3>Core Strengths</h3>
-                    <div class="strengths-list">
-                        <div class="strength-item">
-                            <i class="fas fa-comments"></i>
-                            <p>Confident communicator with a positive and disciplined work ethic</p>
-                        </div>
-                        <div class="strength-item">
-                            <i class="fas fa-rocket"></i>
-                            <p>Fast learner with strong adaptability to new processes and technologies</p>
-                        </div>
-                        <div class="strength-item">
-                            <i class="fas fa-search"></i>
-                            <p>Detail-oriented approach ensuring accuracy and compliance in all deliverables</p>
-                        </div>
-                        <div class="strength-item">
-                            <i class="fas fa-tasks"></i>
-                            <p>Skilled multitasker capable of managing pressure and tight deadlines effectively</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="about-card personal-card">
-                    <h3>Personal Details</h3>
-                    <div class="personal-grid">
-                        <div class="personal-item">
-                            <span class="personal-label">Date of Birth:</span>
-                            <span class="personal-value">31 May 2003</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Gender:</span>
-                            <span class="personal-value">Male</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Nationality:</span>
-                            <span class="personal-value">Indian</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Marital Status:</span>
-                            <span class="personal-value">Unmarried</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Father's Name:</span>
-                            <span class="personal-value">Chandeshwar Singh</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Mother's Name:</span>
-                            <span class="personal-value">Chanda Devi</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Languages:</span>
-                            <span class="personal-value">Hindi, English, Bhojpuri</span>
-                        </div>
-                        <div class="personal-item">
-                            <span class="personal-label">Availability:</span>
-                            <span class="personal-value">Immediate / Full-time</span>
-                        </div>
+                <div
+                    style="background: white; border: 1px solid var(--border); border-radius: 32px; padding: 1.5rem; box-shadow: 0 40px 100px -20px rgba(0,0,0,0.1); overflow: hidden;">
+                    <div
+                        style="background: var(--bg-subtle); border-radius: 20px; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                        <img src="./src/images/app_recruit.png" alt="Dashboard Analytics" class="img-fill"
+                            style="opacity: 0.8; filter: saturate(0.5);">
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Resume Overview Section -->
-    <section id="overview" class="overview">
+    <!-- Trust Bar -->
+    <div class="trust-bar">
         <div class="container">
-            <h2 class="section-title">Resume Overview</h2>
-            <div class="achievements-grid">
-                <div class="achievement-card">
-                    <div class="achievement-icon">🏆</div>
-                    <h3>Multi-location HR</h3>
-                    <p>Coordinated HR operations across multiple branches, ensuring consistent policy execution and employee support.</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">💼</div>
-                    <h3>Payroll & Compliance</h3>
-                    <p>Managed payroll for permanent and contractual staff while overseeing EPFO and ESIC compliance activities.</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">📊</div>
-                    <h3>Reporting & Analysis</h3>
-                    <p>Prepared MIS reports and HR analytics to support operational decisions and manpower planning.</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">📋</div>
-                    <h3>Process Improvement</h3>
-                    <p>Helped implement SOPs and standardized workflows to reduce errors and improve coordination across teams.</p>
-                </div>
+            <p
+                style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">
+                Driving Growth for Industry Leaders</p>
+            <div class="trust-logos">
+                <span class="trust-logo">Be the First one here!!</span>
             </div>
         </div>
-    </section>
+    </div>
 
-    <!-- Work Experience Section -->
-    <section id="experience" class="experience">
+    <!-- Core Value Section -->
+    <section id="benefits" style="background-color: var(--bg-subtle);">
         <div class="container">
-            <h2 class="section-title">Work Experience</h2>
-            <div class="timeline">
-                <!-- Current Role -->
-                <div class="timeline-item">
-                    <div class="timeline-marker"></div>
-                    <div class="timeline-content">
-                        <div class="experience-header">
+            <div class="grid-2">
+                <div class="reveal">
+                    <h2 class="text-gradient">Real Talk: Why Most <br> Hiring Fails.</h2>
+                    <p style="margin-bottom: 2rem;">
+                        Fragmented tools lead to slow communication, lost candidates, and zero visibility. Nextgen
+                        solves the "Recruitment Void" by unifying your entire workflow.
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 2rem;">
+                        <div style="display: flex; gap: 1.5rem;">
+                            <div
+                                style="width: 48px; height: 48px; border-radius: 14px; background: white; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--primary); flex-shrink: 0;">
+                                <i class="fas fa-bolt"></i>
+                            </div>
                             <div>
-                                <h3>HR Executive</h3>
-                                <h4>Brawn Laboratories Ltd.</h4>
-                                <p class="duration"><i class="fas fa-calendar"></i> June 2025 – Present</p>
-                                <p class="location"><i class="fas fa-map-marker-alt"></i> Faridabad, Haryana</p>
-                            </div>
-                            <button class="expand-btn" data-target="exp1"><i class="fas fa-chevron-down"></i></button>
-                        </div>
-                        <div class="experience-context">
-                            <p>As an HR Executive at the Centralized HR Department of Brawn Laboratories Ltd., I am
-                                responsible for managing multi-location HR operations across various branches of the
-                                company. I ensure consistent implementation of policies, compliance, and workforce
-                                coordination between the head office and all branch locations. My role bridges strategic
-                                HR execution, data accuracy, and administrative efficiency to support business
-                                continuity across all units.</p>
-                        </div>
-                        <div class="experience-details" id="exp1">
-                            <div class="detail-section">
-                                <h5><i class="fas fa-check-circle"></i> Key Responsibilities</h5>
-                                <ul>
-                                    <li>Overseeing contractual workforce management through HRMS, ensuring coordination
-                                        between Admin and Time Office teams across multiple branches for smooth workflow
-                                        and compliance</li>
-                                    <li>Supervising end-to-end payroll management of both permanent and contractual
-                                        employees across all locations, ensuring accuracy, timely disbursement, and
-                                        adherence to statutory guidelines</li>
-                                    <li>Managing stipend employee payroll and attendance, ensuring accurate records and
-                                        proper cash-based disbursement in compliance with company norms</li>
-                                    <li>Administering EPFO and ESIC compliance activities including employee
-                                        registration, monthly filing, claim processing, and documentation for all branch
-                                        offices</li>
-                                    <li>Handling multi-location HR coordination, supporting branch HR representatives
-                                        with onboarding, attendance, grievance handling, and documentation consistency
-                                    </li>
-                                    <li>Supporting centralized recruitment operations, assisting in manpower planning,
-                                        candidate sourcing, and onboarding for different sites</li>
-                                    <li>Actively participating in SOP creation, implementation, and enhancement,
-                                        standardizing HR processes across branches to ensure uniformity and operational
-                                        efficiency</li>
-                                    <li>Preparing HR analytics and MIS reports to support management in decision-making,
-                                        manpower optimization, and compliance tracking across branches</li>
-                                </ul>
-                            </div>
-                            <div class="detail-section">
-                                <h5><i class="fas fa-trophy"></i> Key Achievements</h5>
-                                <ul>
-                                    <li>Successfully implemented centralized attendance and payroll tracking across
-                                        multiple company locations</li>
-                                    <li>Played a lead role in aligning branch-level HR practices with head office
-                                        standards, ensuring procedural consistency and compliance</li>
-                                    <li>Contributed to the creation of new SOPs that streamlined communication between
-                                        head office and regional HR teams</li>
-                                    <li>Reduced manual errors and improved reporting speed by integrating HRMS-based
-                                        attendance validation across sites</li>
-                                </ul>
+                                <h4 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Speed of Response</h4>
+                                <p style="font-size: 0.95rem;">Close candidates 40% faster with real-time mobile calling
+                                    and instant sharing.</p>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Previous Role -->
-                <div class="timeline-item">
-                    <div class="timeline-marker"></div>
-                    <div class="timeline-content">
-                        <div class="experience-header">
+                        <div style="display: flex; gap: 1.5rem;">
+                            <div
+                                style="width: 48px; height: 48px; border-radius: 14px; background: white; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0;">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
                             <div>
-                                <h3>HR &amp; Admin Executive</h3>
-                                <h4>Motherson Sumi Wiring India Ltd.</h4>
-                                <p class="subtitle">Wiring Harness Division</p>
-                                <p class="duration"><i class="fas fa-calendar"></i> May 2023 – June 2025</p>
-                                <p class="location"><i class="fas fa-map-marker-alt"></i> Faridabad, Haryana</p>
-                            </div>
-                            <button class="expand-btn" data-target="exp2"><i class="fas fa-chevron-down"></i></button>
-                        </div>
-                        <div class="experience-context">
-                            <p>At Motherson Sumi, I developed a strong foundation in time office management, payroll
-                                processing, statutory compliance, and employee relations. I was responsible for
-                                executing HR operations in alignment with company policies and labor regulations,
-                                contributing directly to workplace discipline and operational efficiency.</p>
-                        </div>
-                        <div class="experience-details" id="exp2">
-                            <div class="detail-section">
-                                <h5><i class="fas fa-user-tie"></i> HRD Responsibilities</h5>
-                                <ul>
-                                    <li>Conducted end-to-end recruitment processes, including candidate sourcing,
-                                        screening, scheduling interviews, and final onboarding</li>
-                                    <li>Managed PF and ESIC compliance, employee declarations, UAN/IP generation,
-                                        monthly filings, and withdrawal settlements</li>
-                                    <li>Organized employee induction and orientation programs to ensure smooth
-                                        integration and awareness of company culture and safety protocols</li>
-                                    <li>Utilized E-Pay and Savior HR software for payroll processing, attendance
-                                        management, and data reporting</li>
-                                    <li>Monitored employee performance, attendance, and leave records, ensuring
-                                        consistent data accuracy</li>
-                                    <li>Supported employee engagement activities and grievance handling to maintain a
-                                        motivated and disciplined workforce</li>
-                                </ul>
-                            </div>
-                            <div class="detail-section">
-                                <h5><i class="fas fa-cogs"></i> Administration &amp; Time Office Management</h5>
-                                <ul>
-                                    <li>Implemented and monitored the 5S methodology (Sort, Set, Shine, Standardize,
-                                        Sustain) for improved workplace organization</li>
-                                    <li>Maintained detailed records of housekeeping materials, stationery, and medical
-                                        supplies to ensure timely stock availability</li>
-                                    <li>Verified daily attendance, late entries, early exits, and overtime approvals to
-                                        ensure punctuality and discipline</li>
-                                    <li>Managed salary preparation, including overtime, arrears, leave adjustments, and
-                                        reimbursements with precision and accuracy</li>
-                                    <li>Prepared and maintained Muster Roll Registers, manpower summaries, and daily MIS
-                                        reports for management review</li>
-                                    <li>Coordinated Full &amp; Final (F&amp;F) settlements, ensuring compliance with
-                                        statutory payments and documentation</li>
-                                    <li>Handled NAPS (National Apprenticeship Promotion Scheme) processes—registration,
-                                        stipend tracking, and claim documentation through government portals</li>
-                                </ul>
-                            </div>
-                            <div class="detail-section">
-                                <h5><i class="fas fa-shield-alt"></i> PF &amp; ESIC Compliance Management</h5>
-                                <ul>
-                                    <li>Administered end-to-end PF and ESIC activities, including registrations,
-                                        returns, and audits</li>
-                                    <li>Supported employees in PF transfers, withdrawals, and ESIC benefits, offering
-                                        proactive guidance and assistance</li>
-                                    <li>Ensured timely submission of monthly statutory reports and maintained accurate
-                                        compliance documentation</li>
-                                </ul>
-                            </div>
-                            <div class="detail-section">
-                                <h5><i class="fas fa-trophy"></i> Achievements</h5>
-                                <ul>
-                                    <li>Played a crucial role in improving payroll accuracy and audit readiness</li>
-                                    <li>Automated attendance validation and MIS reporting, reducing manual work and
-                                        error rates</li>
-                                    <li>Recognized for maintaining punctuality and discipline in the factory premises
-                                        through effective time office monitoring</li>
-                                </ul>
+                                <h4 style="margin-bottom: 0.5rem; font-size: 1.25rem;">Data-Backed Decisions</h4>
+                                <p style="font-size: 0.95rem;">Eliminate guesswork with centralized analytics that show
+                                    exactly where your pipeline is leaking.</p>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Education Section -->
-    <section id="education" class="education">
-        <div class="container">
-            <h2 class="section-title">Education</h2>
-            <div class="education-timeline">
-                <div class="education-item">
-                    <div class="education-icon"><i class="fas fa-graduation-cap"></i></div>
-                    <div class="education-content">
-                        <div class="education-badge pursuing">Pursuing</div>
-                        <h3>Post Graduate Diploma in Human Resources Management</h3>
-                        <h4>Deshbandhu College (IGNOU)</h4>
-                        <p class="education-location"><i class="fas fa-map-marker-alt"></i> New Delhi, India</p>
-                        <p class="education-duration">2025-2027</p>
-                    </div>
-                </div>
-
-                <div class="education-item">
-                    <div class="education-icon"><i class="fas fa-user-graduate"></i></div>
-                    <div class="education-content">
-                        <div class="education-badge completed">Completed</div>
-                        <h3>Bachelor of Arts in English &amp; Public Administration</h3>
-                        <h4>Deshbandhu College (IGNOU)</h4>
-                        <p class="education-location"><i class="fas fa-map-marker-alt"></i> New Delhi, India</p>
-                        <p class="education-duration">2023-2025</p>
-                        <p class="education-details">English Honors and Public Administration | Passed in 2025</p>
-                    </div>
-                </div>
-
-                <div class="education-item">
-                    <div class="education-icon"><i class="fas fa-school"></i></div>
-                    <div class="education-content">
-                        <h3>12th Standard - Science Stream</h3>
-                        <h4>KGBVS</h4>
-                        <p class="education-location"><i class="fas fa-map-marker-alt"></i> New Delhi, India</p>
-                        <p class="education-duration">2021-2023</p>
-                        <p class="education-details">Mathematics, Chemistry &amp; Physics</p>
-                    </div>
-                </div>
-
-                <div class="education-item">
-                    <div class="education-icon"><i class="fas fa-book"></i></div>
-                    <div class="education-content">
-                        <h3>10th Standard</h3>
-                        <h4>Novel Creative Academy</h4>
-                        <p class="education-location"><i class="fas fa-map-marker-alt"></i> Bihar, India</p>
-                        <p class="education-duration">2021-2023</p>
-                        <p class="education-details">Mathematics &amp; Science</p>
+                <div class="reveal">
+                    <div class="card" style="padding: 4rem;">
+                        <div style="text-align: center; margin-bottom: 2rem;">
+                            <div
+                                style="font-size: 4rem; font-weight: 900; color: var(--text-primary); margin-bottom: 0.5rem;">
+                                +65%</div>
+                            <div
+                                style="font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.8rem;">
+                                Candidate NPS Score</div>
+                        </div>
+                        <p style="text-align: center; font-size: 1rem;">
+                            "Nextgen didn't just organize our candidates; it revolutionized our employer brand. Our
+                            candidate feedback scores skyrocketed."
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Skills Section -->
-    <section id="skills" class="skills">
+    <!-- The Suite (Tabs) -->
+    <section id="suite">
         <div class="container">
-            <h2 class="section-title">Skills &amp; Expertise</h2>
-            <div class="skills-grid">
-                <div class="skill-category">
-                    <h3><i class="fas fa-briefcase"></i> HR Operations Management</h3>
-                    <div class="skill-pills">
-                        <span class="skill-pill">Payroll Processing</span>
-                        <span class="skill-pill">Leave Management</span>
-                        <span class="skill-pill">Attendance Tracking</span>
-                        <span class="skill-pill">Workforce Management</span>
-                        <span class="skill-pill">Employee Engagement</span>
-                    </div>
+            <div style="text-align: center; max-width: 800px; margin: 0 auto 4rem;">
+                <h2 class="reveal text-gradient">The Unified Ecosystem</h2>
+                <p class="reveal">Four specialized tools. One seamless engine. Designed to handle the high-pressure
+                    demands of modern recruitment.</p>
+            </div>
+
+            <div class="reveal tab-container">
+                <div class="tab-nav">
+                    <button class="tab-btn active" onclick="switchTab('recruit')">Recruit Dashboard</button>
+                    <button class="tab-btn" onclick="switchTab('candidate')">Candidate Portal</button>
+                    <button class="tab-btn" onclick="switchTab('share')">Share Portal</button>
+                    <button class="tab-btn" onclick="switchTab('dialer')">Remote Dialer</button>
                 </div>
 
-                <div class="skill-category">
-                    <h3><i class="fas fa-laptop-code"></i> HRMS &amp; Software Tools</h3>
-                    <div class="skill-pills">
-                        <span class="skill-pill">E-Pay</span>
-                        <span class="skill-pill">Savior HR</span>
-                        <span class="skill-pill">HRMS</span>
-                        <span class="skill-pill">Excel Automation</span>
-                        <span class="skill-pill">Excel VBA</span>
-                        <span class="skill-pill">MS Office Suite</span>
+                <div id="tab-content" class="card grid-2" style="padding: 4rem;">
+                    <div id="tab-info">
+                        <h3 id="tab-title" style="font-size: 2rem; margin-bottom: 1.5rem;">Recruit Dashboard</h3>
+                        <p id="tab-desc" style="margin-bottom: 2rem;">
+                            The mission control for your hiring team. Manage thousands of applications, automate
+                            communications, and generate deep-dive performance reports instantly.
+                        </p>
+                        <ul id="tab-features"
+                            style="list-style: none; display: flex; flex-direction: column; gap: 1rem;">
+                            <li
+                                style="display: flex; align-items: center; gap: 1rem; font-weight: 600; font-size: 0.95rem;">
+                                <i class="fas fa-check-circle" style="color: var(--primary);"></i> Automated Pipeline
+                                Management
+                            </li>
+                            <li
+                                style="display: flex; align-items: center; gap: 1rem; font-weight: 600; font-size: 0.95rem;">
+                                <i class="fas fa-check-circle" style="color: var(--primary);"></i> Built-in Offer Letter
+                                Engine
+                            </li>
+                            <li
+                                style="display: flex; align-items: center; gap: 1rem; font-weight: 600; font-size: 0.95rem;">
+                                <i class="fas fa-check-circle" style="color: var(--primary);"></i> Advanced Export &
+                                Analytics
+                            </li>
+                        </ul>
                     </div>
-                </div>
-
-                <div class="skill-category">
-                    <h3><i class="fas fa-balance-scale"></i> Statutory Compliance</h3>
-                    <div class="skill-pills">
-                        <span class="skill-pill">PF (Provident Fund)</span>
-                        <span class="skill-pill">ESIC</span>
-                        <span class="skill-pill">Labor Laws</span>
-                        <span class="skill-pill">Compliance Documentation</span>
-                        <span class="skill-pill">Audit Management</span>
-                    </div>
-                </div>
-
-                <div class="skill-category">
-                    <h3><i class="fas fa-user-plus"></i> Recruitment &amp; Onboarding</h3>
-                    <div class="skill-pills">
-                        <span class="skill-pill">End-to-End Hiring</span>
-                        <span class="skill-pill">Candidate Sourcing</span>
-                        <span class="skill-pill">Interview Coordination</span>
-                        <span class="skill-pill">Orientation Programs</span>
-                    </div>
-                </div>
-
-                <div class="skill-category">
-                    <h3><i class="fas fa-file-alt"></i> Process &amp; Documentation</h3>
-                    <div class="skill-pills">
-                        <span class="skill-pill">SOP Implementation</span>
-                        <span class="skill-pill">Policy Development</span>
-                        <span class="skill-pill">Process Optimization</span>
-                        <span class="skill-pill">MIS Reporting</span>
-                        <span class="skill-pill">HR Analytics</span>
-                        <span class="skill-pill">HR Data Reporting</span>
-                    </div>
-                </div>
-
-                <div class="skill-category">
-                    <h3><i class="fas fa-chart-line"></i> Analytical Skills</h3>
-                    <div class="skill-pills">
-                        <span class="skill-pill">Analytical Thinking</span>
-                        <span class="skill-pill">Problem Solving</span>
-                        <span class="skill-pill">Continuous Improvement</span>
+                    <div id="tab-visual" style="display: flex; justify-content: center;">
+                        <div
+                            style="width: 100%; aspect-ratio: 4/3; background: var(--bg-subtle); border-radius: 20px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            <img id="tab-img" src="./src/images/app_recruit.png" alt="Recruit Visual" class="img-fill"
+                                style="opacity: 0.9;">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Certifications & Training Section -->
-    <section id="certifications" class="certifications">
+    <!-- Pricing Section -->
+    <section id="pricing">
         <div class="container">
-            <h2 class="section-title">Certifications & Training</h2>
-            <div class="achievements-grid">
-                <div class="achievement-card">
-                    <div class="achievement-icon">🎓</div>
-                    <h3>HR Process Training</h3>
-                    <p>Completed advanced training in HR operations, payroll processing, and workforce management.</p>
+            <div style="text-align: center; max-width: 800px; margin: 0 auto 4rem;">
+                <h2 class="reveal text-gradient">Plans Built for Scale</h2>
+                <p class="reveal">Choose the plan that fits your recruitment needs. All plans are billed monthly.</p>
+            </div>
+
+            <div class="pricing-grid">
+                <!-- Starter Plan -->
+                <div class="reveal pricing-card">
+                    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Starter</h3>
+                    <p style="font-size: 0.9rem; margin-bottom: 1rem;">For individual recruiters</p>
+                    <div class="price-box">
+                        <span class="currency">₹</span>
+                        <span class="amount">999</span>
+                        <span class="period">/mo</span>
+                    </div>
+                    <ul class="pricing-features">
+                        <li><i class="fas fa-check"></i> Single User Access</li>
+                        <li><i class="fas fa-check"></i> Recruit Software (Basic)</li>
+                        <li><i class="fas fa-times" style="color: #ef4444;"></i> No Profile Sharing</li>
+                        <li><i class="fas fa-times" style="color: #ef4444;"></i> No Remote Dialer</li>
+                        <li><i class="fas fa-times" style="color: #ef4444;"></i> No Career Portal</li>
+                    </ul>
+                    <a href="javascript:void(0)" onclick="payNow('Starter', 999)" class="btn btn-outline">Start Now</a>
                 </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">🧾</div>
-                    <h3>Statutory Compliance</h3>
-                    <p>Acquired strong knowledge of EPFO, ESIC, and labor law documentation for manufacturing environments.</p>
+
+                <!-- Professional Plan -->
+                <div class="reveal pricing-card featured">
+                    <div class="badge">Most Popular</div>
+                    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Professional</h3>
+                    <p style="font-size: 0.9rem; margin-bottom: 1rem;">For small HR teams</p>
+                    <div class="price-box">
+                        <span class="currency">₹</span>
+                        <span class="amount">2,999</span>
+                        <span class="period">/mo</span>
+                    </div>
+                    <ul class="pricing-features">
+                        <li><i class="fas fa-check"></i> 3 Users (1 Admin + 2 Rec.)</li>
+                        <li><i class="fas fa-check"></i> Recruit Software (Pro)</li>
+                        <li><i class="fas fa-check"></i> Career Portal Integration</li>
+                        <li><i class="fas fa-check"></i> 25 Active Job Postings</li>
+                        <li><i class="fas fa-check"></i> Standard Support</li>
+                    </ul>
+                    <a href="javascript:void(0)" onclick="payNow('Professional', 2999)" class="btn btn-primary">Choose
+                        Plan</a>
                 </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">💻</div>
-                    <h3>HRMS & Payroll Systems</h3>
-                    <p>Developed expertise with E-Pay, Savior HR, and Excel-based HRMS reporting for attendance and payroll.</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">📈</div>
-                    <h3>Process Improvement</h3>
-                    <p>Trained in SOP creation and process standardization to improve operational efficiency across sites.</p>
+
+                <!-- Enterprise Plan -->
+                <div class="reveal pricing-card">
+                    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Custom</h3>
+                    <p style="font-size: 0.9rem; margin-bottom: 1rem;">For large staffing firms</p>
+                    <div class="price-box">
+                        <span class="amount" style="font-size: 2.5rem;">Contact Sales</span>
+                    </div>
+                    <ul class="pricing-features">
+                        <li><i class="fas fa-check"></i> Full Recruitment Ecosystem</li>
+                        <li><i class="fas fa-check"></i> Recruit, Share & Dialer</li>
+                        <li><i class="fas fa-check"></i> Career Portal (Custom)</li>
+                        <li><i class="fas fa-check"></i> 120+ Job Postings</li>
+                        <li><i class="fas fa-check"></i> Dedicated Manager</li>
+                    </ul>
+                    <a href="mailto:sales.nextgenudaan@gmail.com" class="btn btn-outline">Contact Sales</a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Key Achievements Section -->
-    <section id="achievements" class="achievements">
+    <!-- Testimonials Section -->
+    <section id="testimonials" style="background-color: var(--bg-subtle);">
         <div class="container">
-            <h2 class="section-title">Key Achievements</h2>
-            <div class="achievements-grid">
-                <div class="achievement-card">
-                    <div class="achievement-icon">🏢</div>
-                    <h3>Centralized HR System</h3>
-                    <p>Successfully implemented centralized attendance and payroll tracking across multiple company
-                        locations</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">⚖️</div>
-                    <h3>Standards Alignment</h3>
-                    <p>Played lead role in aligning branch-level HR practices with head office standards ensuring
-                        procedural consistency</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">📋</div>
-                    <h3>SOP Development</h3>
-                    <p>Contributed to creation of new SOPs that streamlined communication between head office and
-                        regional teams</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">📊</div>
-                    <h3>Error Reduction</h3>
-                    <p>Reduced manual errors and improved reporting speed by integrating HRMS-based attendance
-                        validation</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">💰</div>
-                    <h3>Payroll Excellence</h3>
-                    <p>Played crucial role in improving payroll accuracy and audit readiness across organization</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">⚙️</div>
-                    <h3>Process Automation</h3>
-                    <p>Automated attendance validation and MIS reporting, reducing manual work and error rates
-                        significantly</p>
-                </div>
-                <div class="achievement-card">
-                    <div class="achievement-icon">👥</div>
-                    <h3>Workplace Discipline</h3>
-                    <p>Recognized for maintaining punctuality and discipline in factory premises through effective
-                        monitoring</p>
+            <div style="text-align: center; margin-bottom: 4rem;">
+                <h2 class="reveal text-gradient">Be the First to Join</h2>
+                <p class="reveal" style="margin: 0 auto; max-width: 600px;">
+                    We are currently in early access. Be the first to transform your recruitment workflow and get
+                    exclusive lifetime support from our team.
+                </p>
+            </div>
+
+            <div style="display: flex; justify-content: center;">
+                <div class="reveal testimonial-card" style="max-width: 700px; text-align: center;">
+                    <div style="font-size: 3rem; color: var(--primary); margin-bottom: 1.5rem; opacity: 0.2;"><i
+                            class="fas fa-rocket"></i></div>
+                    <h3 style="font-size: 1.5rem; margin-bottom: 1rem;">Early Adopter Program</h3>
+                    <p style="font-size: 1.1rem; margin-bottom: 2rem; color: var(--text-primary); font-weight: 500;">
+                        Join our elite group of early users. Help us shape the future of Nextgen and receive dedicated
+                        onboarding, custom feature requests, and priority scaling support.
+                    </p>
+                    <a href="#contact" class="btn btn-primary">Secure Your Spot</a>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Hobbies Section -->
-    <section class="hobbies">
+    <!-- Call to Action -->
+    <section id="contact">
         <div class="container">
-            <h2 class="section-title">Hobbies &amp; Interests</h2>
-            <div class="hobbies-grid">
-                <div class="hobby-card">
-                    <div class="hobby-icon">✈️</div>
-                    <h3>Traveling</h3>
+            <div class="reveal cta-box">
+                <h2 style="font-size: clamp(2.5rem, 6vw, 4rem); margin-bottom: 1.5rem;">Start Your High-Performance <br>
+                    Hiring Journey.</h2>
+                <p style="max-width: 600px;">
+                    Experience the difference of a truly unified recruitment ecosystem. Ready to scale?
+                </p>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <a href="mailto:sales.nextgenudaan@gmail.com" class="btn"
+                        style="background-color: white; color: var(--text-primary); padding: 1.25rem 3rem;">Schedule a
+                        Demo</a>
                 </div>
-                <div class="hobby-card">
-                    <div class="hobby-icon">🎵</div>
-                    <h3>Listening to Music</h3>
-                </div>
-                <div class="hobby-card">
-                    <div class="hobby-icon">🎤</div>
-                    <h3>Singing</h3>
-                </div>
-                <div class="hobby-card">
-                    <div class="hobby-icon">💻</div>
-                    <h3>Exploring New Technologies</h3>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact Section -->
-    <section id="contact" class="contact">
-        <div class="container">
-            <h2 class="section-title">Get In Touch</h2>
-            <div class="contact-grid">
-                <div class="contact-info">
-                    <h3>Contact Information</h3>
-                    <div class="contact-item">
-                        <i class="fas fa-envelope"></i>
-                        <div>
-                            <h4>Email</h4>
-                            <a href="mailto:Chandansingh22004@gmail.com">Chandansingh22004@gmail.com</a>
-                        </div>
+                <div style="margin-top: 4rem; display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap;">
+                    <div
+                        style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">
+                        <i class="fas fa-shield-check"></i> Enterprise Grade Security
                     </div>
-                    <div class="contact-item">
-                        <i class="fas fa-phone"></i>
-                        <div>
-                            <h4>Phone</h4>
-                            <a href="tel:+919717113764">+91 9717113764</a>
-                        </div>
+                    <div
+                        style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">
+                        <i class="fas fa-clock"></i> Set up in 60 Minutes
                     </div>
-                    <div class="contact-item">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <div>
-                            <h4>Address</h4>
-                            <p>Gali No.7, Shyam Colony<br>Faridabad, Haryana - 121003</p>
-                        </div>
+                    <div
+                        style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">
+                        <i class="fas fa-headset"></i> 24/7 Dedicated Support
                     </div>
-                    <div class="contact-item">
-                        <i class="fab fa-linkedin"></i>
-                        <div>
-                            <h4>LinkedIn</h4>
-                            <a href="https://linkedin.com/in/chandan-kumar-singh" target="_blank">linkedin.com/in/chandan-kumar-singh</a>
-                        </div>
-                    </div>
-                    <div class="download-btn-container">
-                        <a href="Chandan_Singh_Resume.pdf" download class="btn btn-primary download-btn"><i
-                                class="fas fa-download"></i> Download Resume</a>
-                    </div>
-                </div>
-                <div class="contact-form-container">
-                    <h3>Send a Message</h3>
-                    <form class="contact-form">
-                        <div class="form-group">
-                            <label for="name" class="form-label">Name</label>
-                            <input type="text" id="name" name="name" class="form-control" placeholder="Your name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="email" class="form-label">Email</label>
-                            <input type="email" id="email" name="email" class="form-control" placeholder="Your email" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="message" class="form-label">Message</label>
-                            <textarea id="message" name="message" class="form-control" placeholder="Your message" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Send Message</button>
-                    </form>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer style="padding: 80px 0; border-top: 1px solid var(--border);">
         <div class="container">
-            <div class="footer-content">
-                <p>&copy; 2025 Chandan Kumar Singh. All rights reserved.</p>
-                <div class="social-links">
-                    <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin"></i></a>
-                    <a href="mailto:Chandansingh22004@gmail.com"><i class="fas fa-envelope"></i></a>
-                    <a href="tel:+919717113764"><i class="fas fa-phone"></i></a>
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 2rem;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                        <div
+                            style="width: 24px; height: 24px; background: var(--text-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-users-rays" style="color: white; font-size: 0.7rem;"></i>
+                        </div>
+                        <span
+                            style="font-family: var(--font-heading); font-weight: 800; font-size: 1rem; letter-spacing: -1px; color: var(--text-primary);">Nextgen<span
+                                style="color: var(--primary);">.</span></span>
+                    </div>
+                    <p style="font-size: 0.85rem;">The future of recruitment, unified.</p>
+                </div>
+                <div style="display: flex; gap: 3rem; flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <span
+                            style="font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-primary);">Product</span>
+                        <a href="#"
+                            style="font-size: 0.85rem; color: var(--text-secondary); text-decoration: none;">Features</a>
+                        <a href="#"
+                            style="font-size: 0.85rem; color: var(--text-secondary); text-decoration: none;">Security</a>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <span
+                            style="font-weight: 800; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-primary);">Company</span>
+                        <a href="#"
+                            style="font-size: 0.85rem; color: var(--text-secondary); text-decoration: none;">About</a>
+                        <a href="#"
+                            style="font-size: 0.85rem; color: var(--text-secondary); text-decoration: none;">Contact</a>
+                    </div>
+                </div>
+            </div>
+            <div
+                style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <p style="font-size: 0.8rem; color: var(--text-muted);">&copy; 2026 Nextgen Suite. Build for growth.</p>
+                <p
+                    style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.2em; font-style: italic;">
+                    Om shree shyaam devay namah</p>
+                <div style="display: flex; gap: 1.5rem;">
+                    <a href="#" style="color: var(--text-muted); font-size: 1rem;"><i class="fab fa-twitter"></i></a>
+                    <a href="#" style="color: var(--text-muted); font-size: 1rem;"><i class="fab fa-linkedin"></i></a>
+                    <a href="#" style="color: var(--text-muted); font-size: 1rem;"><i class="fab fa-github"></i></a>
                 </div>
             </div>
         </div>
     </footer>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-    <script src="app.js"></script>
+    <!-- Scripts -->
+    <script src="script.js"></script>
 </body>
 
 </html>
