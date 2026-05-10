@@ -114,33 +114,78 @@ function switchTab(tabKey) {
     }, 250);
 }
 
-function payNow(planName, amount) {
-    const options = {
-        "key": "YOUR_RAZORPAY_KEY_ID", // Enter your Key ID generated from Dashboard
-        "amount": amount * 100, // Amount is in currency subunits (paise).
-        "currency": "INR",
-        "name": "Nextgen Recruitment Suite",
-        "description": `Subscription for ${planName} Plan`,
-        "image": "../recruit/app/assets/images/favicon.png",
-        "handler": function (response) {
-            alert(`Payment Successful! Payment ID: ${response.razorpay_payment_id}`);
-        },
-        "prefill": {
-            "name": "",
-            "email": "",
-            "contact": ""
-        },
-        "notes": {
-            "plan": planName
-        },
-        "theme": {
-            "color": "#0f172a"
-        }
-    };
+async function payNow(planName, amount) {
+    try {
+        // STEP 1: Create Order on the Backend
+        const orderResponse = await fetch('/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: amount * 100, // paise
+                currency: 'INR',
+                receipt: `receipt_${planName.toLowerCase()}_${Date.now()}`
+            })
+        });
 
-    const rzp1 = new Razorpay(options);
-    rzp1.on('payment.failed', function (response) {
-        alert(`Payment Failed: ${response.error.description}`);
-    });
-    rzp1.open();
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok) {
+            throw new Error(orderData.error || 'Failed to create order');
+        }
+
+        // STEP 2: Open Razorpay Checkout Modal
+        const options = {
+            "key": "rzp_test_Snn97mQxGMrkY3", // Public Key ID
+            "amount": orderData.amount,
+            "currency": orderData.currency,
+            "name": "Nextgen Recruitment Suite",
+            "description": `Subscription for ${planName} Plan`,
+            "image": "./src/images/favicon.png",
+            "order_id": orderData.order_id,
+            "handler": async function (response) {
+                // STEP 3: Verify Payment Signature on the Backend
+                const verifyResponse = await fetch('/api/verify-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature
+                    })
+                });
+
+                const verifyData = await verifyResponse.json();
+
+                if (verifyData.success) {
+                    alert('Payment Successful! Your subscription is now active.');
+                    // You can redirect to a success page here
+                } else {
+                    alert('Payment verification failed: ' + verifyData.message);
+                }
+            },
+            "prefill": {
+                "name": "",
+                "email": "",
+                "contact": ""
+            },
+            "theme": {
+                "color": "#0f172a"
+            },
+            "modal": {
+                "ondismiss": function() {
+                    console.log('Checkout modal closed by user');
+                }
+            }
+        };
+
+        const rzp1 = new Razorpay(options);
+        rzp1.on('payment.failed', function (response) {
+            alert(`Payment Failed: ${response.error.description}`);
+        });
+        rzp1.open();
+
+    } catch (error) {
+        console.error('Checkout Error:', error);
+        alert('An error occurred during checkout: ' + error.message);
+    }
 }
