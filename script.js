@@ -127,6 +127,13 @@ async function payNow(planName, amount) {
             })
         });
 
+        const contentType = orderResponse.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await orderResponse.text();
+            console.error('Non-JSON response received:', text);
+            throw new Error(`Server returned non-JSON response (${orderResponse.status}). Please check Vercel logs.`);
+        }
+
         const orderData = await orderResponse.json();
 
         if (!orderResponse.ok) {

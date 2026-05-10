@@ -13,6 +13,12 @@ module.exports = async (req, res) => {
   }
 
   const secret = process.env.RAZORPAY_KEY_SECRET;
+  
+  if (!secret) {
+    console.error('Missing RAZORPAY_KEY_SECRET');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   const body = razorpay_order_id + '|' + razorpay_payment_id;
 
   try {
