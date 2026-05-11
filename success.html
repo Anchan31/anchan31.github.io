@@ -69,18 +69,24 @@
 
             <div style="margin-top: 4rem; padding: 2rem; background: var(--bg-subtle); border-radius: 24px; display: inline-block; border: 1px solid var(--border);">
                 <p style="font-size: 0.9rem; color: var(--text-muted);">
-                    Order ID: <span id="order-id" style="font-weight: 700; color: var(--text-primary);">...</span>
+                    <span id="order-id-label">Order ID: </span><span id="order-id" style="font-weight: 700; color: var(--text-primary);">...</span>
                 </p>
             </div>
         </div>
     </section>
 
     <script>
-        // Extract Order ID from URL
+        // Extract Order ID or Subscription ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const orderId = urlParams.get('order_id');
+        const subId = urlParams.get('subscription_id');
+        
         if (orderId) {
+            document.getElementById('order-id-label').innerText = 'Order ID: ';
             document.getElementById('order-id').innerText = orderId;
+        } else if (subId) {
+            document.getElementById('order-id-label').innerText = 'Subscription ID: ';
+            document.getElementById('order-id').innerText = subId;
         }
 
         // Simple Confetti Effect

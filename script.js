@@ -196,3 +196,57 @@ async function payNow(planName, amount) {
         alert('An error occurred during checkout: ' + error.message);
     }
 }
+
+async function subscribeNow(planId, planName) {
+    try {
+        // STEP 1: Create Subscription on the Backend
+        const subResponse = await fetch('/api/create-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plan_id: planId,
+                total_count: 12, // 1 year subscription
+                notes: {
+                    plan_name: planName
+                }
+            })
+        });
+
+        const subData = await subResponse.json();
+
+        if (!subResponse.ok) {
+            throw new Error(subData.error || 'Failed to create subscription');
+        }
+
+        // STEP 2: Open Razorpay Checkout Modal
+        const options = {
+            "key": "rzp_live_SnoRpxeRfQ16QA", // Use your live key
+            "subscription_id": subData.subscription_id,
+            "name": "NextgenUdaan",
+            "description": `Subscription for ${planName} Plan`,
+            "image": "./src/images/favicon.png",
+            "handler": async function (response) {
+                // STEP 3: Verify Payment Signature (Optional but recommended)
+                // Subscriptions are automatically verified via webhooks, 
+                // but you can still check the initial payment status here.
+                window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
+            },
+            "prefill": {
+                "name": "",
+                "email": "",
+                "contact": ""
+            },
+            "theme": {
+                "color": "#0f172a"
+            }
+        };
+
+        const rzp1 = new Razorpay(options);
+        rzp1.open();
+
+    } catch (error) {
+        console.error('Subscription Error:', error);
+        alert('An error occurred: ' + error.message);
+    }
+}
+
