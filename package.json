@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/Anchan31/anchan31.github.io#readme",
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "dotenv": "^17.4.2",
     "razorpay": "^2.9.6"
   }
