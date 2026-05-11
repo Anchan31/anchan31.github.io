@@ -51,9 +51,12 @@ body {
 ::-webkit-scrollbar {
     display: none;
 }
+
 * {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
 }
 
 /* Layout */
@@ -74,7 +77,10 @@ section {
 }
 
 /* Typography */
-h1, h2, h3, h4 {
+h1,
+h2,
+h3,
+h4 {
     font-family: var(--font-heading);
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -183,8 +189,7 @@ p {
     gap: 4rem;
     flex-wrap: wrap;
     margin-top: 2rem;
-    opacity: 0.5;
-    filter: grayscale(100%);
+    opacity: 1;
 }
 
 .trust-logo {
@@ -192,7 +197,7 @@ p {
     font-weight: 900;
     font-size: 1.5rem;
     letter-spacing: -1px;
-    color: var(--text-muted);
+    color: var(--text-secondary);
 }
 
 /* Testimonials */
@@ -204,10 +209,18 @@ p {
 }
 
 .testimonial-card {
-    background-color: var(--bg-subtle);
+    background-color: var(--bg-white);
     padding: 3rem;
     border-radius: 32px;
     position: relative;
+    border: 1px solid var(--border);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.testimonial-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--primary);
+    box-shadow: 0 30px 60px -15px rgba(37, 99, 235, 0.1);
 }
 
 .testimonial-card::before {
@@ -400,11 +413,11 @@ p {
     border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
     background-color: var(--text-primary);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
     transform: translateX(26px);
 }
 
@@ -445,9 +458,10 @@ input:checked + .slider:before {
 
 @media (max-width: 768px) {
     .nav-bar .container div:last-child {
-        display: none !important; /* Hide desktop nav items on mobile */
+        display: none !important;
+        /* Hide desktop nav items on mobile */
     }
-    
+
     .nav-bar .container {
         justify-content: center !important;
     }
@@ -468,7 +482,7 @@ input:checked + .slider:before {
     .trust-logos {
         gap: 2rem;
     }
-    
+
     .trust-logo {
         font-size: 1rem;
     }
