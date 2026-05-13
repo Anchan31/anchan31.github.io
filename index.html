@@ -216,7 +216,7 @@
                 <p class="reveal">Choose the plan that fits your recruitment needs. All plans are billed monthly.</p>
             </div>
 
-            <div class="pricing-grid">
+            <div class="pricing-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; margin-bottom: 3rem;">
                 <!-- Starter Plan -->
                 <div class="reveal pricing-card">
                     <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Starter</h3>
@@ -255,25 +255,49 @@
                         <li><i class="fas fa-check"></i> Standard Support</li>
                     </ul>
                     <a href="javascript:void(0)" onclick="subscribeNow('plan_SoAKfnYYCTZHDo', 'Professional')"
-                        class="btn btn-primary">Choose
-                        Plan</a>
+                        class="btn btn-primary">Choose Plan</a>
                 </div>
 
                 <!-- Enterprise Plan -->
                 <div class="reveal pricing-card">
-                    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Custom</h3>
+                    <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Enterprise</h3>
                     <p style="font-size: 0.9rem; margin-bottom: 1rem;">For large staffing firms</p>
                     <div class="price-box">
-                        <span class="amount" style="font-size: 2.5rem;">Contact Sales</span>
+                        <span class="currency">₹</span>
+                        <span class="amount">8,999</span>
+                        <span class="period">/mo</span>
                     </div>
                     <ul class="pricing-features">
                         <li><i class="fas fa-check"></i> Full Recruitment Ecosystem</li>
-                        <li><i class="fas fa-check"></i> Recruit, Share & Dialer</li>
+                        <li><i class="fas fa-check"></i> Recruit, Share &amp; Dialer</li>
                         <li><i class="fas fa-check"></i> Career Portal (Custom)</li>
                         <li><i class="fas fa-check"></i> 120+ Job Postings</li>
                         <li><i class="fas fa-check"></i> Dedicated Manager</li>
                     </ul>
-                    <a href="mailto:sales.nextgenudaan@gmail.com" class="btn btn-outline">Contact Sales</a>
+                    <a href="javascript:void(0)" onclick="subscribeNow('plan_SouJvWzj8xFSgg', 'Enterprise')"
+                        class="btn btn-outline">Get Enterprise</a>
+                </div>
+            </div>
+
+            <!-- Custom Horizontal Plan -->
+            <div class="reveal pricing-card" style="flex-direction: row; align-items: center; justify-content: space-between; gap: 4rem; padding: 3rem 4rem; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 300px;">
+                    <h3 style="font-size: 2rem; margin-bottom: 0.5rem;">Custom Plan</h3>
+                    <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Tailored for large enterprises and global agencies.</p>
+                    <ul class="pricing-features" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 0;">
+                        <li><i class="fas fa-check"></i> Tailored User Limits</li>
+                        <li><i class="fas fa-check"></i> White-Label Option</li>
+                        <li><i class="fas fa-check"></i> Priority Onboarding</li>
+                        <li><i class="fas fa-check"></i> SLA &amp; Uptime Guarantee</li>
+                        <li><i class="fas fa-check"></i> Dedicated Account Manager</li>
+                    </ul>
+                </div>
+                <div style="text-align: right; min-width: 250px;">
+                    <div class="price-box" style="margin: 0 0 1.5rem 0;">
+                        <span class="amount" style="font-size: 2.5rem;">Custom Pricing</span>
+                    </div>
+                    <a href="mailto:sales.nextgenudaan@gmail.com?subject=Custom%20Plan%20Inquiry&body=Hi%2C%20I%27m%20interested%20in%20a%20custom%20plan%20for%20my%20organisation." 
+                       class="btn btn-outline" style="width: 100%;">Contact Sales</a>
                 </div>
             </div>
         </div>

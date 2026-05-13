@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     key_secret: process.env.RAZORPAY_KEY_SECRET,
   });
 
-  const { plan_id, total_count, quantity, notes } = req.body;
+  const { plan_id, total_count, quantity, start_at, notes } = req.body;
 
   if (!plan_id) {
     return res.status(400).json({ error: 'Plan ID is required for subscriptions' });
@@ -31,6 +31,11 @@ module.exports = async (req, res) => {
       customer_notify: 1, // Razorpay will notify the customer
       notes: notes || {}
     };
+
+    // If a start_at Unix timestamp is provided, schedule the subscription to begin then
+    if (start_at) {
+      options.start_at = start_at;
+    }
 
     const subscription = await razorpay.subscriptions.create(options);
     

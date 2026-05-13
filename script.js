@@ -199,18 +199,33 @@ async function payNow(planName, amount) {
 
 async function subscribeNow(planId, planName) {
     try {
+        // Compute start_at: 1st of the next feasible month (in Unix seconds)
+        // Razorpay requires start_at to be at least 15 minutes in the future.
+        // Logic: always start on the 1st of the next month (safest & user-friendly).
+        const now = new Date();
+        const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); // 1st of next month
+        const startAt = Math.floor(startDate.getTime() / 1000); // Unix timestamp in seconds
+
         // STEP 1: Create Subscription on the Backend
         const subResponse = await fetch('/api/create-subscription', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 plan_id: planId,
-                total_count: 12, // 1 year subscription
+                total_count: 12, // 12 months = 1 year
+                start_at: startAt,
                 notes: {
                     plan_name: planName
                 }
             })
         });
+
+        const contentType = subResponse.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const text = await subResponse.text();
+            console.error('Non-JSON response received:', text);
+            throw new Error(`Server returned non-JSON response (${subResponse.status}). If you are developing locally, make sure to run using 'vercel dev' instead of Live Server.`);
+        }
 
         const subData = await subResponse.json();
 
@@ -220,15 +235,12 @@ async function subscribeNow(planId, planName) {
 
         // STEP 2: Open Razorpay Checkout Modal
         const options = {
-            "key": "rzp_live_SnoRpxeRfQ16QA", // Use your live key
+            "key": "rzp_live_SnoRpxeRfQ16QA",
             "subscription_id": subData.subscription_id,
             "name": "NextgenUdaan",
-            "description": `Subscription for ${planName} Plan`,
+            "description": `${planName} Plan — 12-Month Subscription`,
             "image": "./src/images/favicon.png",
             "handler": async function (response) {
-                // STEP 3: Verify Payment Signature (Optional but recommended)
-                // Subscriptions are automatically verified via webhooks, 
-                // but you can still check the initial payment status here.
                 window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
             },
             "prefill": {
@@ -249,4 +261,5 @@ async function subscribeNow(planId, planName) {
         alert('An error occurred: ' + error.message);
     }
 }
+
 
