@@ -1,4 +1,15 @@
 const crypto = require('crypto');
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin (Ensure serviceAccount is in env)
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
+
+const db = admin.firestore();
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -29,8 +40,20 @@ module.exports = async (req, res) => {
       // This is called every time a payment is successfully deducted (initial + renewals)
       const subscription = payload.subscription.entity;
       const payment = payload.payment.entity;
+      
       console.log(`Payment of ${payment.amount / 100} successful for subscription ${subscription.id}`);
-      // TODO: Update your database to grant/extend user access
+
+      // Update/Create Subscription record in Firestore
+      await db.collection('subscriptions').doc(subscription.id).set({
+        subscription_id: subscription.id,
+        plan_id: subscription.plan_id,
+        customer_email: payment.email || 'N/A',
+        status: subscription.status,
+        amount: payment.amount / 100,
+        next_charge_at: subscription.charge_at ? new Date(subscription.charge_at * 1000) : null,
+        updated_at: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
       break;
 
     case 'subscription.cancelled':
