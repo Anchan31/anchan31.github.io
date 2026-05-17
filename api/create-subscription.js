@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
   try {
     const options = {
       plan_id: plan_id,
-      total_count: total_count || 12, // Default to 12 cycles (1 year for monthly)
+      total_count: total_count !== undefined ? total_count : 1, // Default to 1 cycle (1 month)
       quantity: quantity || 1,
       customer_notify: 1, // Razorpay will notify the customer
       notes: notes || {}

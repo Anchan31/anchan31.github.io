@@ -1,4 +1,56 @@
+// Initialize Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDhsrCX281ohlvo8Z3MKak0wYzISCND8x8",
+  authDomain: "recruit-a.firebaseapp.com",
+  projectId: "recruit-a",
+  storageBucket: "recruit-a.firebasestorage.app",
+  messagingSenderId: "564795783977",
+  appId: "1:564795783977:web:47278f0aa8116192abd538",
+  measurementId: "G-3RQJ52TLKW"
+};
+
+// Initialize Firebase
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = typeof firebase !== 'undefined' ? firebase.firestore() : null;
+
+// Global State for current subscription purchase
+let activePlanId = '';
+let activePlanName = '';
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Modal Close Button Logic
+    const modal = document.getElementById('subscription-modal');
+    const form = document.getElementById('subscription-form');
+    const closeBtn = document.getElementById('close-modal-btn');
+
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+    }
+
+    if (form && modal) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            modal.classList.remove('active');
+            
+            const name = document.getElementById('user-name').value;
+            const email = document.getElementById('user-email').value;
+            const company = document.getElementById('user-company').value;
+            const mobile = document.getElementById('user-mobile').value;
+
+            await processSubscription({
+                name,
+                email,
+                company,
+                mobile,
+                planId: activePlanId,
+                planName: activePlanName
+            });
+        });
+    }
 
     // Reveal Animations on Scroll
     const reveals = document.querySelectorAll('.reveal');
@@ -197,11 +249,21 @@ async function payNow(planName, amount) {
     }
 }
 
-async function subscribeNow(planId, planName) {
+function subscribeNow(planId, planName) {
+    activePlanId = planId;
+    activePlanName = planName;
+    const modal = document.getElementById('subscription-modal');
+    if (modal) {
+        document.getElementById('subscription-form').reset();
+        modal.classList.add('active');
+    }
+}
+
+async function processSubscription(userDetails) {
     try {
+        const { name, email, company, mobile, planId, planName } = userDetails;
+
         // Compute start_at: 1st of the next feasible month (in Unix seconds)
-        // Razorpay requires start_at to be at least 15 minutes in the future.
-        // Logic: always start on the 1st of the next month (safest & user-friendly).
         const now = new Date();
         const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); // 1st of next month
         const startAt = Math.floor(startDate.getTime() / 1000); // Unix timestamp in seconds
@@ -212,10 +274,13 @@ async function subscribeNow(planId, planName) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 plan_id: planId,
-                total_count: 12, // 12 months = 1 year
+                total_count: 1, // Billed for 1 month only
                 start_at: startAt,
                 notes: {
-                    plan_name: planName
+                    plan_name: planName,
+                    customer_name: name,
+                    customer_company: company,
+                    customer_mobile: mobile
                 }
             })
         });
@@ -238,15 +303,38 @@ async function subscribeNow(planId, planName) {
             "key": "rzp_live_SnoRpxeRfQ16QA",
             "subscription_id": subData.subscription_id,
             "name": "NextgenUdaan",
-            "description": `${planName} Plan — 12-Month Subscription`,
+            "description": `${planName} Plan — 1-Month Access`,
             "image": "./src/images/favicon.png",
             "handler": async function (response) {
-                window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
+                try {
+                    if (db) {
+                        // Save to Firestore before redirecting
+                        await db.collection("subscriptions").doc(response.razorpay_subscription_id).set({
+                            subscription_id: response.razorpay_subscription_id,
+                            name: name,
+                            email: email,
+                            company: company,
+                            mobile: mobile,
+                            plan_id: planId,
+                            plan_name: planName,
+                            created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                            status: "active"
+                        });
+                    } else {
+                        console.warn("Firebase not initialized or available.");
+                    }
+                    
+                    window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
+                } catch (dbError) {
+                    console.error("Firestore Save Error: ", dbError);
+                    alert("Subscription created but details couldn't be saved. Please contact support with subscription ID: " + response.razorpay_subscription_id);
+                    window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
+                }
             },
             "prefill": {
-                "name": "",
-                "email": "",
-                "contact": ""
+                "name": name,
+                "email": email,
+                "contact": mobile
             },
             "theme": {
                 "color": "#0f172a"
