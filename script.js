@@ -263,11 +263,6 @@ async function processSubscription(userDetails) {
     try {
         const { name, email, company, mobile, planId, planName } = userDetails;
 
-        // Compute start_at: 1st of the next feasible month (in Unix seconds)
-        const now = new Date();
-        const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)); // 1st of next month
-        const startAt = Math.floor(startDate.getTime() / 1000); // Unix timestamp in seconds
-
         // STEP 1: Create Subscription on the Backend
         const subResponse = await fetch('/api/create-subscription', {
             method: 'POST',
@@ -275,7 +270,6 @@ async function processSubscription(userDetails) {
             body: JSON.stringify({
                 plan_id: planId,
                 total_count: 1, // Billed for 1 month only
-                start_at: startAt,
                 notes: {
                     plan_name: planName,
                     customer_name: name,
