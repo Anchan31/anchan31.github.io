@@ -46,6 +46,7 @@ module.exports = async (req, res) => {
     });
   } catch (error) {
     console.error('Razorpay Subscription Error:', error);
-    res.status(500).json({ error: error.message || 'Failed to create subscription' });
+    const errorMessage = error.description || (error.error && error.error.description) || error.message || 'Failed to create subscription';
+    res.status(500).json({ error: errorMessage });
   }
 };

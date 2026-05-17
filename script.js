@@ -263,66 +263,91 @@ async function processSubscription(userDetails) {
     try {
         const { name, email, company, mobile, planId, planName } = userDetails;
 
-        // STEP 1: Create Subscription on the Backend
-        const subResponse = await fetch('/api/create-subscription', {
+        // Plan price mapping
+        const planPrices = {
+            'Starter': 1499,
+            'Professional': 2999,
+            'Enterprise': 8999
+        };
+        const price = planPrices[planName] || 1499;
+
+        // STEP 1: Create Order on the Backend (One-time payment to charge immediately)
+        const orderResponse = await fetch('/api/create-order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                plan_id: planId,
-                total_count: 1, // Billed for 1 month only
-                notes: {
-                    plan_name: planName,
-                    customer_name: name,
-                    customer_company: company,
-                    customer_mobile: mobile
-                }
+                amount: price * 100, // in paise
+                currency: 'INR',
+                receipt: `receipt_${planName.toLowerCase()}_${Date.now()}`
             })
         });
 
-        const contentType = subResponse.headers.get("content-type");
+        const contentType = orderResponse.headers.get("content-type");
         if (!contentType || !contentType.includes("application/json")) {
-            const text = await subResponse.text();
+            const text = await orderResponse.text();
             console.error('Non-JSON response received:', text);
-            throw new Error(`Server returned non-JSON response (${subResponse.status}). If you are developing locally, make sure to run using 'vercel dev' instead of Live Server.`);
+            throw new Error(`Server returned non-JSON response (${orderResponse.status}). If you are developing locally, make sure to run using 'vercel dev' instead of Live Server.`);
         }
 
-        const subData = await subResponse.json();
+        const orderData = await orderResponse.json();
 
-        if (!subResponse.ok) {
-            throw new Error(subData.error || 'Failed to create subscription');
+        if (!orderResponse.ok) {
+            throw new Error(orderData.error || 'Failed to create order');
         }
 
         // STEP 2: Open Razorpay Checkout Modal
         const options = {
             "key": "rzp_live_SnoRpxeRfQ16QA",
-            "subscription_id": subData.subscription_id,
+            "amount": orderData.amount,
+            "currency": orderData.currency,
             "name": "NextgenUdaan",
             "description": `${planName} Plan — 1-Month Access`,
             "image": "./src/images/favicon.png",
+            "order_id": orderData.order_id,
             "handler": async function (response) {
                 try {
-                    if (db) {
-                        // Save to Firestore before redirecting
-                        await db.collection("subscriptions").doc(response.razorpay_subscription_id).set({
-                            subscription_id: response.razorpay_subscription_id,
-                            name: name,
-                            email: email,
-                            company: company,
-                            mobile: mobile,
-                            plan_id: planId,
-                            plan_name: planName,
-                            created_at: firebase.firestore.FieldValue.serverTimestamp(),
-                            status: "active"
-                        });
+                    // STEP 3: Verify Payment Signature on the Backend
+                    const verifyResponse = await fetch('/api/verify-payment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature
+                        })
+                    });
+
+                    const verifyData = await verifyResponse.json();
+
+                    if (verifyData.success) {
+                        if (db) {
+                            // Save details with order_id as subscription_id in Firestore
+                            await db.collection("subscriptions").doc(response.razorpay_order_id).set({
+                                subscription_id: response.razorpay_order_id, // Save order_id as subscription_id for dashboard compatibility
+                                name: name,
+                                email: email,
+                                company: company,
+                                mobile: mobile,
+                                plan_id: planId,
+                                plan_name: planName,
+                                payment_id: response.razorpay_payment_id,
+                                amount: price,
+                                created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                                status: "active"
+                            });
+                        } else {
+                            console.warn("Firebase not initialized or available.");
+                        }
+
+                        // Redirect to Success Page with subscription_id parameter so success.html displays "Subscription ID"
+                        window.location.href = `success.html?subscription_id=${response.razorpay_order_id}`;
                     } else {
-                        console.warn("Firebase not initialized or available.");
+                        alert('Payment verification failed: ' + verifyData.message);
                     }
-                    
-                    window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
                 } catch (dbError) {
-                    console.error("Firestore Save Error: ", dbError);
-                    alert("Subscription created but details couldn't be saved. Please contact support with subscription ID: " + response.razorpay_subscription_id);
-                    window.location.href = `success.html?subscription_id=${response.razorpay_subscription_id}`;
+                    console.error("Payment Process/Firestore Save Error: ", dbError);
+                    alert("Payment succeeded but details couldn't be saved. Please contact support with Order ID: " + response.razorpay_order_id);
+                    window.location.href = `success.html?subscription_id=${response.razorpay_order_id}`;
                 }
             },
             "prefill": {
@@ -339,7 +364,7 @@ async function processSubscription(userDetails) {
         rzp1.open();
 
     } catch (error) {
-        console.error('Subscription Error:', error);
+        console.error('Subscription Order Error:', error);
         alert('An error occurred: ' + error.message);
     }
 }
