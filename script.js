@@ -302,9 +302,7 @@ async function processSubscription(userDetails) {
         const options = {
             "key": "rzp_live_SnoRpxeRfQ16QA",
             "subscription_id": subData.subscription_id,
-            "name": "NextgenUdaan",
             "description": `${planName} Plan — 3-Day Trial + 3-Month Sub`,
-            "image": "./src/images/favicon.png",
             "handler": async function (response) {
                 try {
                     if (db) {
