@@ -7,6 +7,10 @@
     <title>Contact Us | Nextgen Recruitment Suite</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK (v8 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
 
 <body>
@@ -15,9 +19,7 @@
         <div class="container" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <a href="index.html" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem;">
-                    <div style="width: 32px; height: 32px; background: var(--text-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-users-rays" style="color: white; font-size: 0.9rem;"></i>
-                    </div>
+                    <img src="src/images/ngu_logo.png" alt="Nextgen Logo" style="width: 32px; height: 32px; border-radius: 8px; object-fit: contain;">
                     <span style="font-family: var(--font-heading); font-weight: 800; font-size: 1.25rem; letter-spacing: -1px; color: var(--text-primary);">Nextgen<span style="color: var(--primary);">.</span></span>
                 </a>
             </div>
@@ -60,7 +62,7 @@
 
                 <div class="reveal active">
                     <div class="card" style="padding: 3rem;">
-                        <form action="https://formspree.io/f/mdkzbdgk" method="POST" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <form id="contact-form" style="display: flex; flex-direction: column; gap: 1.5rem;">
                             <div>
                                 <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Full Name</label>
                                 <input type="text" name="name" required placeholder="John Doe" style="width: 100%; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-subtle); font-family: inherit;">
@@ -96,9 +98,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 2rem;">
                 <div>
                     <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
-                        <div style="width: 24px; height: 24px; background: var(--text-primary); border-radius: 6px; display: flex; align-items: center; justify-content: center;">
-                            <i class="fas fa-users-rays" style="color: white; font-size: 0.7rem;"></i>
-                        </div>
+                        <img src="src/images/ngu_logo.png" alt="Nextgen Logo" style="width: 24px; height: 24px; border-radius: 6px; object-fit: contain;">
                         <span style="font-family: var(--font-heading); font-weight: 800; font-size: 1rem; letter-spacing: -1px; color: var(--text-primary);">Nextgen<span style="color: var(--primary);">.</span></span>
                     </div>
                     <p style="font-size: 0.85rem;">The future of recruitment, unified.</p>

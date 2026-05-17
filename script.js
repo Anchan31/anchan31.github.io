@@ -349,4 +349,43 @@ async function processSubscription(userDetails) {
     }
 }
 
+// Contact Form Submission to Firestore
+document.addEventListener('DOMContentLoaded', () => {
+    const contactForm = document.getElementById('contact-form');
+    if (contactForm) {
+        contactForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitBtn = contactForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerText;
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting...';
+
+            const formData = new FormData(contactForm);
+            const messageData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                company_size: formData.get('company_size'),
+                message: formData.get('message'),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                if (db) {
+                    await db.collection('contact_messages').add(messageData);
+                    alert('Thank you for contacting us! We have received your message and will get back to you shortly.');
+                    contactForm.reset();
+                } else {
+                    throw new Error('Database not initialized');
+                }
+            } catch (error) {
+                console.error('Error saving message:', error);
+                alert('Oops! Something went wrong while sending your message. Please try again later or contact us directly.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
+            }
+        });
+    }
+});
+
 
