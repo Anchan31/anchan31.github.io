@@ -194,7 +194,7 @@ async function payNow(planName, amount) {
 
         // STEP 2: Open Razorpay Checkout Modal
         const options = {
-            "key": "rzp_live_SnoRpxeRfQ16QA", // Live Public Key ID
+            "key": "rzp_live_SqYugAybXREdik", // Live Public Key ID
             "amount": orderData.amount,
             "currency": orderData.currency,
             "name": "NextgenUdaan",
@@ -300,7 +300,7 @@ async function processSubscription(userDetails) {
 
         // STEP 2: Open Razorpay Checkout Modal for Subscription
         const options = {
-            "key": "rzp_live_SnoRpxeRfQ16QA",
+            "key": "rzp_live_SqYugAybXREdik",
             "subscription_id": subData.subscription_id,
             "description": `${planName} Plan — 3-Day Trial + 3-Month Sub`,
             "handler": async function (response) {
