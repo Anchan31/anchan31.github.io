@@ -1,12 +1,12 @@
 // Initialize Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyDhsrCX281ohlvo8Z3MKak0wYzISCND8x8",
-  authDomain: "recruit-a.firebaseapp.com",
-  projectId: "recruit-a",
-  storageBucket: "recruit-a.firebasestorage.app",
-  messagingSenderId: "564795783977",
-  appId: "1:564795783977:web:47278f0aa8116192abd538",
-  measurementId: "G-3RQJ52TLKW"
+  apiKey: "AIzaSyDKuFUJyHUl5AIFSFHCg-4S_wadsha6Et4",
+  authDomain: "recruitment-suite-hr.firebaseapp.com",
+  projectId: "recruitment-suite-hr",
+  storageBucket: "recruitment-suite-hr.firebasestorage.app",
+  messagingSenderId: "1049067446272",
+  appId: "1:1049067446272:web:a0eb4e5a9fac1589a8f8e5",
+  measurementId: "G-87FVXXYEP7"
 };
 
 // Initialize Firebase
@@ -263,9 +263,9 @@ async function processSubscription(userDetails) {
     try {
         const { name, email, company, mobile, planId, planName } = userDetails;
 
-        // Calculate start_at exactly 3 days from now for a 3-day free trial
+        // Calculate start_at exactly 14 days from now for a 14-days trial
         const now = new Date();
-        const trialEndDate = new Date(now.getTime() + (3 * 24 * 60 * 60 * 1000));
+        const trialEndDate = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
         const startAt = Math.floor(trialEndDate.getTime() / 1000); // Unix timestamp in seconds
 
         // STEP 1: Create Subscription on the Backend (Billed for 3 months)
@@ -302,7 +302,7 @@ async function processSubscription(userDetails) {
         const options = {
             "key": "rzp_live_SqYugAybXREdik",
             "subscription_id": subData.subscription_id,
-            "description": `${planName} Plan — 3-Day Trial + 3-Month Sub`,
+            "description": `${planName} Plan — 14-Days Trial + 3-Month Sub`,
             "handler": async function (response) {
                 try {
                     if (db) {
