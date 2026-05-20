@@ -1,0 +1,173 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPER FUNCTIONS ---
+    
+    // Checks if the user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Retrieves the user's profile document from the 'users' collection
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Gets the active user's associated companyId (slug)
+    function getUserCompanyId() {
+      return getUserData().companyId;
+    }
+    
+    // Gets the active user's assigned role
+    function getUserRole() {
+      return getUserData().role;
+    }
+
+    // --- COLLECTION RULES ---
+
+    // 1. Settings Collection (Global & Company-Specific Portal Configurations)
+    match /settings/{docId} {
+      // Anyone (public) can read the branding configurations for any domain/tenant
+      allow read: if true;
+      
+      // Only owners or admins can write branding settings, and they can only edit their own company's configurations
+      allow write: if isSignedIn() && 
+                   (getUserRole() == 'owner' || getUserRole() == 'admin') &&
+                   (docId == 'publicPortal' || docId == 'publicPortal_' + getUserCompanyId());
+    }
+
+    // 2. Companies Collection (General Tenant Metadata)
+    match /companies/{companyId} {
+      // General metadata list is readable by anyone to support the Careers layout & Access provisioning
+      allow read: if true;
+      
+      // Only owners/admins can manage company profiles
+      allow write: if isSignedIn() && (getUserRole() == 'owner' || getUserRole() == 'admin');
+    }
+
+    // 3. Users Collection (User Profiles and RBAC Permissions)
+    match /users/{uid} {
+      // Users can read their own profile, or other profiles within their same company
+      allow read: if isSignedIn() && (request.auth.uid == uid || getUserCompanyId() == resource.data.companyId);
+      
+      // Authenticated users can auto-provision or create their own initial profile document
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      
+      // Users can update their own details, and owners/admins can manage profiles belonging to their company
+      allow update: if isSignedIn() && (
+        request.auth.uid == uid || 
+        (getUserCompanyId() == resource.data.companyId && (getUserRole() == 'owner' || getUserRole() == 'admin'))
+      );
+      
+      // Only owners/admins can delete user accounts in their company
+      allow delete: if isSignedIn() && 
+                    getUserCompanyId() == resource.data.companyId && 
+                    (getUserRole() == 'owner' || getUserRole() == 'admin');
+    }
+
+    // 4. Jobs Collection (Multi-Tenant Job Openings)
+    match /jobs/{jobId} {
+      // Anyone can read open jobs; otherwise, logged-in company users can read all their own company's jobs
+      allow read: if (resource.data.status == 'Open') || 
+                   (isSignedIn() && getUserCompanyId() == resource.data.companyId);
+      
+      // Owners, admins, and recruiters can manage jobs belonging to their company
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) &&
+                   getUserRole() != 'viewer';
+    }
+
+    // 5. Candidates Collection (Job Applications & Intake Records)
+    match /candidates/{candidateId} {
+      // Candidates can view their own application, and share pages are publicly readable
+      allow read: if true;
+      
+      // Candidates can submit applications publicly
+      allow create: if true;
+      
+      // Only company recruiters and administrators can modify or delete application records for their company
+      allow update, delete: if isSignedIn() && 
+                            (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                            getUserRole() != 'viewer';
+    }
+
+    // 6. Interviews Collection (Candidate Scheduling)
+    match /interviews/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   getUserRole() != 'viewer';
+    }
+
+    // 7. Offers Collection (Candidate Offer Dispatches)
+    match /offers/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   getUserRole() != 'viewer';
+    }
+
+    // 8. Offer Templates (Company-Wide Offer Content Builders)
+    match /offerTemplates/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   (getUserRole() == 'owner' || getUserRole() == 'admin');
+    }
+
+    // 9. WhatsApp Templates (Outbound Dialer Templates)
+    match /whatsappTemplates/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   (getUserRole() == 'owner' || getUserRole() == 'admin');
+    }
+
+    // 10. Presence Collection (Real-Time Collaborator Signaling)
+    match /presence/{id} {
+      allow read, write: if isSignedIn() && 
+                         (getUserCompanyId() == resource.data.companyId || getUserCompanyId() == request.resource.data.companyId);
+    }
+
+    // 11. Audit Logs Collection (System Activity Tracking)
+    match /audit_logs/{id} {
+      // Only owners/admins can audit company records
+      allow read: if isSignedIn() && 
+                   getUserCompanyId() == resource.data.companyId && 
+                   (getUserRole() == 'owner' || getUserRole() == 'admin');
+      
+      // All authenticated team members can write audit events for their company
+      allow create: if isSignedIn() && getUserCompanyId() == request.resource.data.companyId;
+      
+      // Audit logs are immutable once written
+      allow update, delete: if false;
+    }
+
+    // 12. Masters Collections (Organizational Taxonomies)
+    match /masters_departments/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   getUserRole() != 'viewer';
+    }
+    match /masters_designations/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   getUserRole() != 'viewer';
+    }
+    match /masters_industries/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   getUserRole() != 'viewer';
+    }
+    match /masters_sources/{id} {
+      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
+      allow write: if isSignedIn() && 
+                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
+                   getUserRole() != 'viewer';
+    }
+  }
+}
