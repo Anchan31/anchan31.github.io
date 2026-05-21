@@ -6,7 +6,7 @@ self.addEventListener('notificationclick', event => {
             for (const client of clients) {
                 if ('focus' in client) return client.focus();
             }
-            if (self.clients.openWindow) return self.clients.openWindow('dialer/index.html');
+            if (self.clients.openWindow) return self.clients.openWindow('/dialer/index.html');
             return undefined;
         })
     );

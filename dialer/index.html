@@ -6,12 +6,12 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Remote Dialer - Nextgen Recruitment Suite</title>
-    <link rel="icon" type="image/png" href="../app/assets/images/favicon.png">
+    <link rel="icon" type="image/png" href="/app/assets/images/favicon.png">
     <meta name="theme-color" content="#3b82f6">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Remote Dialer">
-    <link rel="apple-touch-icon" href="../app/assets/images/favicon.png">
+    <link rel="apple-touch-icon" href="/app/assets/images/favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -391,7 +391,7 @@
     </footer>
 
     <script type="module">
-        import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, doc, onSnapshot, updateDoc, serverTimestamp } from "../app/js/firebase_config.js";
+        import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, doc, onSnapshot, updateDoc, serverTimestamp } from "/app/js/firebase_config.js";
 
         let swRegistration = null;
         let wakeLock = null;
@@ -399,7 +399,7 @@
         // PWA Registration
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('../app/js/sw.js').then(reg => {
+                navigator.serviceWorker.register('/dialer/sw.js').then(reg => {
                     console.log('SW Registered');
                     swRegistration = reg;
                 }).catch(err => console.log('SW Fail', err));
@@ -552,8 +552,8 @@
                 const title = "Incoming Call Request";
                 const options = {
                     body: `Call ${data.candidateName} at ${data.phoneNumber}`,
-                    icon: "../app/assets/images/favicon.png",
-                    badge: "../app/assets/images/favicon.png",
+                    icon: "/app/assets/images/favicon.png",
+                    badge: "/app/assets/images/favicon.png",
                     tag: "remote-call",
                     renotify: true,
                     vibrate: [200, 100, 200]
