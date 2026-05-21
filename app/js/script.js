@@ -49,6 +49,50 @@ function userRole() {
     return currentUserProfile?.role || perm.ROLES.RECRUITER;
 }
 
+function getMillis(value) {
+    if (!value) return 0;
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (typeof value.toDate === 'function') return value.toDate().getTime();
+    if (typeof value.seconds === 'number') return value.seconds * 1000;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function sortByDateDesc(rows, field = 'createdAt') {
+    return (rows || []).slice().sort((a, b) => getMillis(b?.[field]) - getMillis(a?.[field]));
+}
+
+function companyDisplayName(company) {
+    return company?.name || company?.companyName || company?.displayName || 'Company';
+}
+
+function normalizeClientId(value = '') {
+    return value.toString().toLowerCase().trim()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w-]+/g, '')
+        .replace(/--+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+}
+
+function getClientIdFromHost() {
+    const host = window.location.hostname.toLowerCase();
+    if (!host || host === 'localhost' || host === '127.0.0.1') return '';
+    const ignoredHosts = new Set(['anchan31.github.io', 'www.anchan31.github.io']);
+    if (ignoredHosts.has(host)) return '';
+    const parts = host.split('.');
+    if (parts.length < 3 || parts[0] === 'www') return '';
+    return normalizeClientId(parts[0]);
+}
+
+function getRequestedClientId() {
+    return normalizeClientId(
+        sessionStorage.getItem('tenant_client_id') ||
+        document.getElementById('auth-client-id')?.value ||
+        getClientIdFromHost()
+    );
+}
+
 function isElevatedRole() {
     return perm.isManagerUp(userRole());
 }
@@ -130,9 +174,15 @@ async function loadUserDirectoryForAssignments() {
         return;
     }
     try {
-        const q = query(collection(db, 'users'), where('status', '==', 'active'), limit(100));
+        const q = query(
+            collection(db, 'users'),
+            where('companyId', '==', currentUserProfile?.companyId || null),
+            limit(100)
+        );
         const snap = await getDocs(q);
-        cachedUserDirectory = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        cachedUserDirectory = snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((u) => u.status === 'active');
     } catch (e) {
         console.warn('User directory', e);
         cachedUserDirectory = [];
@@ -371,9 +421,9 @@ function subscribeAuditFeed() {
     }
     try {
         const cid = currentUserProfile.companyId;
-        const q = query(collection(db, 'audit_logs'), where('companyId', '==', cid), orderBy('at', 'desc'), limit(80));
+        const q = query(collection(db, 'audit_logs'), where('companyId', '==', cid), limit(80));
         auditUnsub = onSnapshot(q, (snap) => {
-            const logs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const logs = sortByDateDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })), 'at');
             window.cachedAuditLogs = logs;
 
             // Update Dashboard Feed if present
@@ -388,7 +438,7 @@ function subscribeAuditFeed() {
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-[11px] font-bold text-slate-900 dark:text-white leading-tight">${escapeHtml(x.action)} <span class="text-slate-400 font-medium">on</span> ${escapeHtml(x.entity)}</p>
-                                <p class="text-[9px] text-slate-500 mt-1 font-medium">${escapeHtml(x.byEmail.split('@')[0])} • ${t}</p>
+                                <p class="text-[9px] text-slate-500 mt-1 font-medium">${escapeHtml((x.byEmail || 'system').split('@')[0])} • ${t}</p>
                             </div>
                         </div>
                     `;
@@ -452,12 +502,10 @@ window.filterAuditForEntity = async (entity, entityId) => {
             where('companyId', '==', currentUserProfile?.companyId || null),
             where('entity', '==', entity),
             where('entityId', '==', entityId),
-            orderBy('at', 'desc'),
             limit(40)
         );
         const snap = await getDocs(qy);
-        box.innerHTML = snap.docs.map((d) => {
-            const x = d.data();
+        box.innerHTML = sortByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'at').map((x) => {
             const t = x.at?.toDate ? x.at.toDate().toLocaleString() : '';
             return `<div class="text-[11px] border-b border-slate-100 dark:border-slate-800 py-2"><span class="text-slate-500">${escapeHtml(t)}</span> — <strong>${escapeHtml(x.action || '')}</strong> by ${escapeHtml(x.byEmail || '')}</div>`;
         }).join('') || '<p class="text-xs">No history.</p>';
@@ -484,7 +532,11 @@ window.filterOffersByStatus = (status) => {
 window.loadOfferTemplates = async () => {
     const list = [];
     try {
-        const q = query(collection(db, 'offerTemplates'), orderBy('createdAt', 'desc'));
+        const q = query(
+            collection(db, 'offerTemplates'),
+            where('companyId', '==', currentUserProfile?.companyId || null),
+            limit(200)
+        );
         const snapshot = await getDocs(q);
         snapshot.forEach(docSnap => {
             list.push({ id: docSnap.id, ...docSnap.data() });
@@ -493,7 +545,7 @@ window.loadOfferTemplates = async () => {
         console.error('Cannot load offer templates', e);
         showToast('Template load failed');
     }
-    cachedOfferTemplates = list;
+    cachedOfferTemplates = sortByDateDesc(list);
     renderOfferTemplates();
     populateOfferTemplateSelector();
 };
@@ -700,18 +752,16 @@ window.addOfferTemplateFromUrl = async () => {
         const type = fields.length > 0 ? 'AcroForm' : 'Static';
         const urlName = decodeURIComponent(url.split('/').pop().split('?')[0] || 'PDF Template');
 
-        const docRef = await addDoc(collection(db, 'offerTemplates'), {
+        const docRef = await addDoc(collection(db, 'offerTemplates'), stampSharedCreate({
             name: (nameInput?.value || '').trim() || urlName,
             url,
             originalUrl: originalUrl.trim(),
             sourceType: url.includes('github') || url.includes('githubusercontent') ? 'github' : 'url',
-            createdAt: serverTimestamp(),
             type,
             fields,
             pageCount: info.pageCount || 0,
-            pageSize: info.pageSize || null,
-            updatedAt: serverTimestamp()
-        });
+            pageSize: info.pageSize || null
+        }));
 
         selectedOfferTemplateId = docRef.id;
         if (urlInput) urlInput.value = '';
@@ -1292,7 +1342,7 @@ function computeSearchCount(query) {
         (c.phone || '').toLowerCase().includes(q))
     ).length;
     count += cachedJobs.filter(j => (j.title || '').toLowerCase().includes(q) || (j.department || '').toLowerCase().includes(q)).length;
-    count += cachedCompanies.filter(c => (c.name || '').toLowerCase().includes(q)).length;
+    count += cachedCompanies.filter(c => companyDisplayName(c).toLowerCase().includes(q)).length;
     return count;
 }
 
@@ -1467,24 +1517,40 @@ window.handleSocialLogin = (provider) => {
 };
 
 async function handleLogin() {
+    const clientId = normalizeClientId(document.getElementById('auth-client-id')?.value || getClientIdFromHost());
     const email = document.getElementById('auth-email').value;
     const pass = document.getElementById('auth-password').value;
-    if (!email || !pass) {
-        showError("Please enter both email and password.");
+    if (!clientId || !email || !pass) {
+        showError("Please enter Client ID, email, and password.");
         return;
     }
     const orig = loginBtn.innerText; loginBtn.innerText = 'Signing in...'; loginBtn.disabled = true;
     try {
+        sessionStorage.setItem('tenant_client_id', clientId);
         await signInWithEmailAndPassword(auth, email, pass);
         // Store password temporarily for Dialer QR Login bridge
         sessionStorage.setItem('dialer_bridge_pass', pass);
-    } catch (err) { showError(err.message); }
+    } catch (err) {
+        sessionStorage.removeItem('tenant_client_id');
+        showError(err.message);
+    }
     finally { loginBtn.innerText = orig; loginBtn.disabled = false; }
 }
 
 loginBtn.addEventListener('click', handleLogin);
 
 // Enter Key Support for Login
+const authClientIdInput = document.getElementById('auth-client-id');
+const hostClientId = getClientIdFromHost();
+if (authClientIdInput && hostClientId) {
+    authClientIdInput.value = hostClientId;
+}
+authClientIdInput?.addEventListener('input', (e) => {
+    e.target.value = normalizeClientId(e.target.value);
+});
+authClientIdInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') document.getElementById('auth-email').focus();
+});
 document.getElementById('auth-email').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') document.getElementById('auth-password').focus();
 });
@@ -1653,6 +1719,21 @@ onAuthStateChanged(auth, async (user) => {
             return;
         }
 
+        const requestedClientId = getRequestedClientId();
+        const profileClientId = normalizeClientId(profile.companyId || profile.clientId || profile.subdomain);
+        if (!requestedClientId) {
+            showError('Enter your Client ID before signing in.');
+            await signOut(auth);
+            return;
+        }
+        if (!profileClientId || requestedClientId !== profileClientId) {
+            sessionStorage.removeItem('tenant_client_id');
+            showError('Client ID does not match this login. Check your company subdomain and try again.');
+            await signOut(auth);
+            return;
+        }
+        sessionStorage.setItem('tenant_client_id', profileClientId);
+
         currentUser = user;
         currentUserProfile = profile;
 
@@ -1768,26 +1849,17 @@ function setupRealtimeListeners() {
     onSnapshot(compQuery, (snapshot) => {
         logSource("Companies", snapshot);
         cachedCompanies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        updateDropdowns();
-        queueRender();
-        bump();
-    }, (error) => handleError("Companies", error));
-
-    // Modernization: Listen to Subscription in Hub
-    onSnapshot(doc(hubDb, "companies", cid), (snap) => {
-        if (snap.exists()) {
-            const data = snap.data();
+        const company = cachedCompanies[0];
+        if (company) {
             window.activeSubscription = {
-                plan: data.plan || 'starter',
-                status: data.subscriptionStatus || 'active',
-                limits: data.limits || { users: 5, jobs: 10 },
-                expiresAt: data.subscriptionExpiresAt
+                plan: company.plan || 'starter',
+                status: company.subscriptionStatus || company.status || 'active',
+                limits: company.limits || { users: company.maxUsers || 5, jobs: company.maxJobs || 10 },
+                expiresAt: company.subscriptionExpiresAt || null
             };
-            console.log("[Hub] Subscription updated:", window.activeSubscription);
-            
             const subBadge = document.getElementById('nav-subscription-badge');
             if (subBadge) {
-                subBadge.textContent = (window.activeSubscription.plan).toUpperCase();
+                subBadge.textContent = String(window.activeSubscription.plan).toUpperCase();
                 subBadge.classList.remove('hidden');
                 if (window.activeSubscription.status !== 'active') {
                     subBadge.classList.replace('bg-emerald-100', 'bg-rose-100');
@@ -1795,13 +1867,16 @@ function setupRealtimeListeners() {
                 }
             }
         }
-    }, (error) => console.error("Hub subscription listener failed:", error));
+        updateDropdowns();
+        queueRender();
+        bump();
+    }, (error) => handleError("Companies", error));
 
     // Listen for Jobs (Filtered by Company)
-    const jobsQuery = query(collection(db, "jobs"), where("companyId", "==", cid), orderBy("createdAt", "desc"), limit(200));
+    const jobsQuery = query(collection(db, "jobs"), where("companyId", "==", cid), limit(200));
     onSnapshot(jobsQuery, (snapshot) => {
         logSource("Jobs", snapshot);
-        cachedJobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        cachedJobs = sortByDateDesc(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         updateDropdowns();
         if (typeof renderTalentPool === 'function') renderTalentPool();
         queueRender();
@@ -1829,10 +1904,10 @@ function setupRealtimeListeners() {
             bump();
         }, (error) => handleError("Interviews", error));
 
-        const offersQuery = query(collection(db, "offers"), where("companyId", "==", cid), orderBy("createdAt", "desc"), limit(200));
+        const offersQuery = query(collection(db, "offers"), where("companyId", "==", cid), limit(200));
         onSnapshot(offersQuery, (snapshot) => {
             logSource("Offers", snapshot);
-            cachedOffers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            cachedOffers = sortByDateDesc(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
             queueRender();
             bump();
         }, (error) => handleError("Offers", error));
@@ -1901,10 +1976,10 @@ function setupRealtimeListeners() {
     }
 
     // Listen for WhatsApp Templates (Filtered by Company)
-    const waQuery = query(collection(db, "whatsappTemplates"), where("companyId", "==", cid), orderBy("createdAt", "desc"), limit(50));
+    const waQuery = query(collection(db, "whatsappTemplates"), where("companyId", "==", cid), limit(50));
     onSnapshot(waQuery, (snapshot) => {
         logSource("WhatsApp Templates", snapshot);
-        cachedWaTemplates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        cachedWaTemplates = sortByDateDesc(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         updateWaDropdowns();
         queueRender();
         bump();
@@ -2371,22 +2446,24 @@ function renderJobs() {
 function renderCompanies() {
     const container = document.getElementById('companies-list');
     const q = getEffectiveQuery('companies');
-    const filtered = q ? cachedCompanies.filter(c => (c.name || '').toLowerCase().includes(q)) : cachedCompanies.slice();
+    const filtered = q ? cachedCompanies.filter(c => companyDisplayName(c).toLowerCase().includes(q)) : cachedCompanies.slice();
     if (filtered.length === 0) {
         container.innerHTML = '<div class="text-slate-400 p-8 col-span-full text-center bg-slate-800/20 rounded-2xl border border-dashed border-slate-700">No companies found.</div>';
         return;
     }
-    container.innerHTML = filtered.map(c => `
+    container.innerHTML = filtered.map(c => {
+        const name = companyDisplayName(c);
+        return `
             <div class="glass-card p-0 rounded-2xl flex flex-col group overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 transition-all duration-300 shadow-sm hover:shadow-xl relative">
                     <div class="h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
                     <div class="p-6">
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl font-bold shadow-sm">
-                                    ${c.name.charAt(0)}
+                                    ${escapeHtml(name.charAt(0).toUpperCase() || 'C')}
                                 </div>
                                 <div class="overflow-hidden min-w-0 flex-1">
-                                    <h4 class="text-lg font-bold truncate text-slate-800 dark:text-white pr-16">${highlight(c.name, q)}</h4>
+                                    <h4 class="text-lg font-bold truncate text-slate-800 dark:text-white pr-16">${highlight(name, q)}</h4>
                                     <p class="text-blue-500 text-[10px] uppercase tracking-widest font-bold">${highlight(c.industry || 'Industry', q)}</p>
                                 </div>
                             </div>
@@ -2424,7 +2501,8 @@ function renderCompanies() {
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `;
+    }).join('');
 }
 
 
@@ -5616,7 +5694,7 @@ function updateDropdowns(includeCandidateJobId = null) {
             cachedCompanies.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.id;
-                opt.text = c.name || c.id;
+                opt.text = companyDisplayName(c) || c.id;
                 companySelect.appendChild(opt);
             });
             // Ensure selecting a company prefills the Job Location when appropriate
@@ -7752,14 +7830,15 @@ window.showCompanyProfile = (id) => {
     const c = cachedCompanies.find(x => x.id === id);
     if (!c) return;
 
-    window.openProfileView('Company Profile', c.name, 'fa-building');
+    const name = companyDisplayName(c);
+    window.openProfileView('Company Profile', name, 'fa-building');
 
     // Identity Update
-    document.getElementById('profile-name').innerText = c.name || 'Company Name';
+    document.getElementById('profile-name').innerText = name;
     document.getElementById('profile-type').innerText = c.industry || 'Industry Unassigned';
     const avatarBox = document.getElementById('profile-avatar-box');
     if (avatarBox) {
-        avatarBox.innerHTML = c.name ? c.name.charAt(0).toUpperCase() : 'C';
+        avatarBox.innerHTML = name.charAt(0).toUpperCase() || 'C';
         avatarBox.classList.add('bg-indigo-600', 'text-white', 'font-black');
     }
 
@@ -9168,13 +9247,13 @@ window.populateJobBranches = () => {
 
     // Add headquarters as an option
     if (company.location) {
-        options += `<option value="headquarters">${company.name} - Headquarters (${company.location})</option>`;
+        options += `<option value="headquarters">${companyDisplayName(company)} - Headquarters (${company.location})</option>`;
     }
 
     // Add branches
     if (company.branches && company.branches.length > 0) {
         company.branches.forEach((branch, index) => {
-            options += `<option value="branch-${index}">${company.name} - ${branch.name} (${branch.location})</option>`;
+            options += `<option value="branch-${index}">${companyDisplayName(company)} - ${branch.name} (${branch.location})</option>`;
         });
     }
 
@@ -9746,7 +9825,7 @@ function populateJobCompanySelect() {
 
     let options = '<option value="">Select Hiring Company</option>';
     cachedCompanies.forEach(company => {
-        options += `<option value="${company.id}">${company.name}</option>`;
+        options += `<option value="${company.id}">${companyDisplayName(company)}</option>`;
     });
     companySelect.innerHTML = options;
 }
@@ -9932,8 +10011,12 @@ window.renderUserManagementTable = async () => {
     const searchVal = document.getElementById('user-mgmt-search')?.value.toLowerCase() || '';
 
     try {
-        const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(200)));
-        const allUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const snap = await getDocs(query(
+            collection(db, 'users'),
+            where('companyId', '==', currentUserProfile?.companyId || null),
+            limit(200)
+        ));
+        const allUsers = sortByDateDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         const filteredUsers = allUsers.filter(u => {
             const name = (u.displayName || '').toLowerCase();
