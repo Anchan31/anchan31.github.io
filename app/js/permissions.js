@@ -66,7 +66,7 @@ export function hasPermission(roleId, permission) {
 
 /** Legacy support for old functions while migrating to granular RBAC */
 export function isManagerUp(roleId) {
-    return roleId === 'owner' || roleId === 'admin';
+    return roleId === 'owner' || roleId === 'admin' || roleId === 'manager';
 }
 
 export function isWriter(roleId) {
@@ -83,6 +83,10 @@ export function canReadOwnedDoc(roleId, doc, uid) {
 
 export function canManageUsers(roleId) {
     return hasPermission(roleId, PERMISSIONS.manageUsers);
+}
+
+export function canEditSharedData(roleId) {
+    return isManagerUp(roleId) || hasPermission(roleId, PERMISSIONS.manageJobs);
 }
 
 export function canViewAudit(roleId) {
