@@ -5,7 +5,9 @@
   "main": "script.js",
   "scripts": {
     "dev": "npx -y http-server -p 8080",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:tailwind": "node scripts/build-tailwind.js",
+    "watch:tailwind": "npx tailwindcss -i ./src/input.css -o ./app/css/tailwind-out.css --watch"
   },
   "repository": {
     "type": "git",
@@ -23,5 +25,8 @@
     "dotenv": "^17.4.2",
     "firebase-admin": "^13.9.0",
     "razorpay": "^2.9.6"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
   }
 }
