@@ -5,7 +5,14 @@ import {
     collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, query, where, orderBy, writeBatch, limit, runTransaction, startAfter
 } from "./firebase_config.js";
 import * as perm from "./permissions.js";
-import { FEATURES, verifyUserModuleAccess } from "./access_control.js";
+import {
+    FEATURES,
+    verifyUserModuleAccess,
+    normalizeClientId,
+    resolveTenantClientId,
+    getTenantFromHost,
+    getTenantFromQuery
+} from "./access_control.js";
 
 
 // PDF.js setup
@@ -67,31 +74,8 @@ function companyDisplayName(company) {
     return company?.name || company?.companyName || company?.displayName || 'Company';
 }
 
-function normalizeClientId(value = '') {
-    return value.toString().toLowerCase().trim()
-        .replace(/\s+/g, '-')
-        .replace(/[^\w-]+/g, '')
-        .replace(/--+/g, '-')
-        .replace(/^-+/, '')
-        .replace(/-+$/, '');
-}
-
-function getClientIdFromHost() {
-    const host = window.location.hostname.toLowerCase();
-    if (!host || host === 'localhost' || host === '127.0.0.1') return '';
-    const ignoredHosts = new Set(['anchan31.github.io', 'www.anchan31.github.io']);
-    if (ignoredHosts.has(host)) return '';
-    const parts = host.split('.');
-    if (parts.length < 3 || parts[0] === 'www') return '';
-    return normalizeClientId(parts[0]);
-}
-
 function getRequestedClientId() {
-    return normalizeClientId(
-        getClientIdFromHost() ||
-        sessionStorage.getItem('tenant_client_id') ||
-        document.getElementById('auth-client-id')?.value
-    );
+    return resolveTenantClientId({ includeSession: true, includeInput: true });
 }
 
 function isElevatedRole() {
@@ -1518,7 +1502,7 @@ window.handleSocialLogin = (provider) => {
 };
 
 async function handleLogin() {
-    const clientId = normalizeClientId(document.getElementById('auth-client-id')?.value || getClientIdFromHost());
+    const clientId = resolveTenantClientId({ includeSession: true, includeInput: true });
     const email = document.getElementById('auth-email').value;
     const pass = document.getElementById('auth-password').value;
     if (!clientId || !email || !pass) {
@@ -1542,10 +1526,28 @@ loginBtn.addEventListener('click', handleLogin);
 
 // Enter Key Support for Login
 const authClientIdInput = document.getElementById('auth-client-id');
-const hostClientId = getClientIdFromHost();
-if (authClientIdInput && hostClientId) {
-    authClientIdInput.value = hostClientId;
+
+function applyResolvedTenantToLogin() {
+    const queryTenant = getTenantFromQuery();
+    const hostTenant = getTenantFromHost();
+    const tenant = resolveTenantClientId({ includeSession: true, includeInput: false });
+
+    if (queryTenant) {
+        sessionStorage.setItem('tenant_client_id', queryTenant);
+    } else if (hostTenant) {
+        sessionStorage.setItem('tenant_client_id', hostTenant);
+    }
+
+    if (!authClientIdInput || !tenant) return;
+
+    authClientIdInput.value = tenant;
+    if (hostTenant) {
+        authClientIdInput.readOnly = true;
+        authClientIdInput.title = 'Workspace is determined by your company URL';
+    }
 }
+
+applyResolvedTenantToLogin();
 authClientIdInput?.addEventListener('input', (e) => {
     e.target.value = normalizeClientId(e.target.value);
 });

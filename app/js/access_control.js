@@ -69,6 +69,18 @@ const RESERVED_HOSTS = new Set([
     "127"
 ]);
 
+/** Hostnames with no tenant slug in the first label (path/query carry tenant instead). */
+const APEX_HOSTS = new Set([
+    "anchan31.github.io",
+    "www.anchan31.github.io",
+    "nextgenudaan.in",
+    "www.nextgenudaan.in",
+    "app.nextgenudaan.in",
+    "www.app.nextgenudaan.in"
+]);
+
+const TENANT_QUERY_KEYS = ["companyId", "company", "cid", "clientId", "subdomain"];
+
 const MODULE_PERMISSIONS = {
     [FEATURES.recruitModule]: [PERMISSIONS.fullAccess, PERMISSIONS.manageJobs, PERMISSIONS.manageCandidates, PERMISSIONS.readOnly],
     [FEATURES.careerPortal]: [PERMISSIONS.fullAccess, PERMISSIONS.manageJobs, PERMISSIONS.readOnly],
@@ -86,13 +98,50 @@ export function normalizeClientId(value = "") {
         .replace(/-+$/, "");
 }
 
+export function getTenantFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    for (const key of TENANT_QUERY_KEYS) {
+        const value = params.get(key);
+        if (value) return normalizeClientId(value);
+    }
+    return "";
+}
+
 export function getTenantFromHost() {
     const host = window.location.hostname.toLowerCase();
     if (!host || host === "localhost" || host === "127.0.0.1") return "";
+    if (APEX_HOSTS.has(host)) return "";
+
     const parts = host.split(".");
     if (parts.length < 3) return "";
+
     const subdomain = normalizeClientId(parts[0]);
     return RESERVED_HOSTS.has(subdomain) ? "" : subdomain;
+}
+
+/**
+ * Resolve workspace client ID: subdomain host, then URL params, then session/input.
+ */
+export function resolveTenantClientId(options = {}) {
+    const { includeSession = true, includeInput = false } = options;
+
+    const fromHost = getTenantFromHost();
+    if (fromHost) return fromHost;
+
+    const fromQuery = getTenantFromQuery();
+    if (fromQuery) return fromQuery;
+
+    if (includeSession) {
+        const stored = normalizeClientId(sessionStorage.getItem("tenant_client_id") || "");
+        if (stored) return stored;
+    }
+
+    if (includeInput) {
+        const inputVal = normalizeClientId(document.getElementById("auth-client-id")?.value || "");
+        if (inputVal) return inputVal;
+    }
+
+    return "";
 }
 
 export function resolvePlanLimits(subscription, company) {
