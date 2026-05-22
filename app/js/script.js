@@ -13,6 +13,18 @@ import {
     getTenantFromHost,
     getTenantFromQuery
 } from "./access_control.js";
+import {
+    bindTenantProfile,
+    getActiveCompanyId,
+    requireActiveCompanyId,
+    docBelongsToCompany,
+    withCompanyId,
+    stampMasterCreate,
+    stampMasterUpdate,
+    companySettingsDocId,
+    assertDocBelongsToCompany,
+    companyQuery
+} from "./tenant_store.js";
 
 
 // PDF.js setup
@@ -20,8 +32,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 // --- STATE MANAGEMENT ---
 let currentUser = null;
-/** @type {{ role: string, displayName?: string, status?: string, email?: string } | null} */
+/** @type {{ role: string, displayName?: string, status?: string, email?: string, companyId?: string } | null} */
 let currentUserProfile = null;
+bindTenantProfile(() => currentUserProfile);
 let cachedUserDirectory = [];
 let myPipelineOnly = false;
 let _candidatesOwner = [];
@@ -253,9 +266,9 @@ async function releaseActiveEditLock() {
 
 function stampOwnedCreate(extra = {}) {
     const uid = auth.currentUser?.uid;
-    const cid = currentUserProfile?.companyId;
+    const cid = requireActiveCompanyId();
     const assigned = extra.assignedTo !== undefined ? extra.assignedTo : [];
-    const { assignedTo: _as, ownerId: _ow, ...rest } = extra;
+    const { assignedTo: _as, ownerId: _ow, companyId: _cid, ...rest } = extra;
     return {
         ...rest,
         ownerId: uid,
@@ -279,11 +292,10 @@ function stampOwnedUpdate(extra = {}) {
 
 function stampSharedCreate(extra = {}) {
     const uid = auth.currentUser?.uid;
-    const cid = currentUserProfile?.companyId;
+    const { companyId: _cid, ...rest } = extra;
     return {
-        ...extra,
+        ...withCompanyId(rest),
         ownerId: uid,
-        companyId: cid,
         createdBy: uid,
         createdAt: serverTimestamp(),
         updatedBy: uid,
@@ -298,16 +310,15 @@ function stampSharedUpdate(extra = {}) {
 async function appendAuditEntry(entity, entityId, action, changes) {
     if (!auth.currentUser) return;
     try {
-        await addDoc(collection(db, 'audit_logs'), {
+        await addDoc(collection(db, 'audit_logs'), withCompanyId({
             entity,
             entityId: entityId || null,
             action,
-            companyId: currentUserProfile?.companyId || null,
             byUid: auth.currentUser.uid,
             byEmail: auth.currentUser.email || '',
             at: serverTimestamp(),
             changes: changes || null
-        });
+        }));
     } catch (e) { console.error('Audit failed', e); }
 }
 
@@ -357,13 +368,12 @@ function startPresenceHeartbeat() {
     if (!uid) return;
     const tick = () => {
         const sec = document.getElementById('section-title')?.innerText || '';
-        setDoc(doc(db, 'presence', uid), {
+        setDoc(doc(db, 'presence', uid), withCompanyId({
             email: auth.currentUser?.email || '',
             displayName: currentUserProfile?.displayName || '',
-            companyId: currentUserProfile?.companyId || null,
             lastSeen: serverTimestamp(),
             section: sec.slice(0, 120)
-        }, { merge: true }).catch(() => { });
+        }), { merge: true }).catch(() => { });
     };
     tick();
     presenceHeartbeat = setInterval(tick, 30000);
@@ -1871,11 +1881,22 @@ function setupRealtimeListeners() {
         }
     };
 
-    // Listen for Companies (Only the user's company)
-    const compQuery = query(collection(db, "companies"), where("companyId", "==", cid), limit(1));
-    onSnapshot(compQuery, (snapshot) => {
-        logSource("Companies", snapshot);
-        cachedCompanies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Listen for Companies (only this workspace — doc id or companyId field)
+    const applyCompanySnapshot = (companySnap) => {
+        if (!companySnap?.exists()) {
+            cachedCompanies = [];
+            return;
+        }
+        cachedCompanies = [{ id: companySnap.id, ...companySnap.data() }];
+    };
+
+    onSnapshot(doc(db, "companies", cid), (companySnap) => {
+        logSource("Companies(doc)", { size: companySnap.exists() ? 1 : 0 });
+        if (companySnap.exists()) {
+            applyCompanySnapshot(companySnap);
+        } else {
+            cachedCompanies = [];
+        }
         const company = cachedCompanies[0];
         if (company) {
             window.activeSubscription = {
@@ -1898,6 +1919,33 @@ function setupRealtimeListeners() {
         queueRender();
         bump();
     }, (error) => handleError("Companies", error));
+
+    const compFieldQuery = query(collection(db, "companies"), where("companyId", "==", cid), limit(1));
+    onSnapshot(compFieldQuery, (snapshot) => {
+        if (cachedCompanies.length > 0) return;
+        logSource("Companies(field)", snapshot);
+        cachedCompanies = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const company = cachedCompanies[0];
+        if (company) {
+            window.activeSubscription = {
+                plan: company.plan || 'starter',
+                status: company.subscriptionStatus || company.status || 'active',
+                limits: company.limits || { users: company.maxUsers || 5, jobs: company.maxJobs || 10 },
+                expiresAt: company.subscriptionExpiresAt || null
+            };
+            const subBadge = document.getElementById('nav-subscription-badge');
+            if (subBadge) {
+                subBadge.textContent = String(window.activeSubscription.plan).toUpperCase();
+                subBadge.classList.remove('hidden');
+                if (window.activeSubscription.status !== 'active') {
+                    subBadge.classList.replace('bg-emerald-100', 'bg-rose-100');
+                    subBadge.classList.replace('text-emerald-600', 'text-rose-600');
+                }
+            }
+        }
+        updateDropdowns();
+        queueRender();
+    }, (error) => handleError("Companies(field)", error));
 
     // Listen for Jobs (Filtered by Company)
     const jobsQuery = query(collection(db, "jobs"), where("companyId", "==", cid), limit(200));
@@ -3663,12 +3711,20 @@ const attachFormHandlers = () => {
                 const editId = data.id;
                 delete data.id;
 
+                const workspaceId = requireActiveCompanyId();
+                data.companyId = workspaceId;
+                data.clientId = workspaceId;
+                data.subdomain = workspaceId;
+
                 if (editId) {
+                    if (editId !== workspaceId) {
+                        throw new Error("You can only edit your own company workspace.");
+                    }
                     await updateDoc(doc(db, "companies", editId), stampSharedUpdate(data));
                     showToast("Company Updated!");
                 } else {
-                    await addDoc(collection(db, "companies"), stampSharedCreate(data));
-                    showToast("Company Added!");
+                    await setDoc(doc(db, "companies", workspaceId), stampSharedCreate(data), { merge: true });
+                    showToast("Company workspace saved!");
                 }
 
                 notifyCrossTabChange({ type: 'data-update', collection: 'companies', id: editId || 'new' });
@@ -3920,7 +3976,9 @@ window.toggleJobStatus = async (id, currentStatus) => {
             updateData.closingDate = null;
         }
 
-        await updateDoc(doc(db, "jobs", id), updateData);
+        const job = cachedJobs.find(j => j.id === id);
+        assertDocBelongsToCompany(job, 'job');
+        await updateDoc(doc(db, "jobs", id), stampSharedUpdate(updateData));
         notifyCrossTabChange({ type: 'data-update', collection: 'jobs', id });
         showToast(`Job successfully marked as ${newStatus} !`);
     } catch (e) {
@@ -4085,8 +4143,7 @@ async function uploadResumeToCloudinary(file, publicId) {
     let dynamicUrl = CLOUDINARY_URL;
     let dynamicPreset = CLOUDINARY_PRESET;
     try {
-        const cid = currentUserProfile?.companyId;
-        const settingsDocId = cid ? `publicPortal_${cid}` : "publicPortal";
+        const settingsDocId = getActiveCompanyId() ? companySettingsDocId() : "publicPortal";
         let portalDoc = await getDoc(doc(db, "settings", settingsDocId));
         let pData = null;
         if (portalDoc.exists()) {
@@ -4751,11 +4808,12 @@ document.getElementById('form-wa-template').onsubmit = async (e) => {
         delete data.id;
 
         if (editId) {
-            await updateDoc(doc(db, "whatsappTemplates", editId), data);
+            const existing = cachedWaTemplates.find(t => t.id === editId);
+            assertDocBelongsToCompany(existing, 'template');
+            await updateDoc(doc(db, "whatsappTemplates", editId), stampSharedUpdate(data));
             showToast("Template Updated!");
         } else {
-            data.createdAt = serverTimestamp();
-            await addDoc(collection(db, "whatsappTemplates"), data);
+            await addDoc(collection(db, "whatsappTemplates"), stampSharedCreate(data));
             showToast("Template Saved!");
         }
 
@@ -4825,10 +4883,10 @@ window.updateCandidateStage = async (id, stage) => {
                 yesterday.setDate(yesterday.getDate() - 1);
                 const closingDateStr = yesterday.toISOString().split('T')[0];
 
-                await updateDoc(doc(db, "jobs", cand.jobId), {
+                await updateDoc(doc(db, "jobs", cand.jobId), stampSharedUpdate({
                     closingDate: closingDateStr,
                     status: 'Closed'
-                });
+                }));
                 showToast("Stage Updated & Job Closed!");
             } else {
                 // Read the job doc directly from Firestore instead of relying
@@ -4837,6 +4895,7 @@ window.updateCandidateStage = async (id, stage) => {
                 const jobSnap = await getDoc(jobRef);
                 if (jobSnap.exists()) {
                     const jobData = jobSnap.data();
+                    assertDocBelongsToCompany(jobData, 'job');
 
                     // ONLY re-open if the candidate was PREVIOUSLY Hired or Selected
                     // and is now moving to a different stage.
@@ -4851,10 +4910,10 @@ window.updateCandidateStage = async (id, stage) => {
                             (c.stage === 'Selected' || c.stage === 'Hired')
                         );
                         if (!otherHired) {
-                            await updateDoc(jobRef, {
+                            await updateDoc(jobRef, stampSharedUpdate({
                                 closingDate: null,
                                 status: 'Open'
-                            });
+                            }));
                             showToast("Stage Updated & Job Re-opened!");
                         } else {
                             showToast("Stage Updated (Job remains closed — other candidates are still Hired/Selected)");
@@ -5612,6 +5671,35 @@ window.fetchTemplatesReport = () => {
 window.deleteDocById = async (col, id) => {
     if (confirm("Are you sure you want to permanently delete this?")) {
         try {
+            const tenantCols = new Set([
+                'jobs', 'candidates', 'interviews', 'offers', 'offerTemplates',
+                'whatsappTemplates', 'masters_departments', 'masters_designations',
+                'masters_industries', 'masters_sources'
+            ]);
+            if (tenantCols.has(col)) {
+                const cached =
+                    col === 'jobs' ? cachedJobs :
+                        col === 'candidates' ? cachedCandidates :
+                            col === 'interviews' ? cachedInterviews :
+                                col === 'offers' ? cachedOffers :
+                                    col === 'offerTemplates' ? cachedOfferTemplates :
+                                        col === 'whatsappTemplates' ? cachedWaTemplates :
+                                            col === 'masters_departments' ? cachedDepartments :
+                                                col === 'masters_designations' ? cachedDesignations :
+                                                    col === 'masters_industries' ? cachedIndustries :
+                                                        col === 'masters_sources' ? cachedSources :
+                                                            null;
+                const row = cached?.find?.((r) => r.id === id);
+                if (row) assertDocBelongsToCompany(row, col);
+                else {
+                    const snap = await getDoc(doc(db, col, id));
+                    if (snap.exists()) assertDocBelongsToCompany(snap.data(), col);
+                }
+            }
+            if (col === 'companies' && id !== getActiveCompanyId()) {
+                throw new Error('You can only manage your own company workspace.');
+            }
+
             // INTERCEPT FOR INTERVIEWS: Revert candidate stage
             if (col === "interviews") {
                 const interview = cachedInterviews.find(i => i.id === id);
@@ -5620,9 +5708,9 @@ window.deleteDocById = async (col, id) => {
                     if (cand) {
                         // Only revert if they aren't already explicitly selected/rejected
                         if (cand.stage !== "Selected" && cand.stage !== "Rejected" && cand.stage !== "Backed Out" && cand.stage !== "Not Interested") {
-                            await updateDoc(doc(db, "candidates", interview.candidateId), {
+                            await updateDoc(doc(db, "candidates", interview.candidateId), stampOwnedUpdate({
                                 stage: interview.previousStage
-                            });
+                            }));
                         }
                     }
                 }
@@ -7036,6 +7124,8 @@ window.deleteOffer = async (id) => {
     }
 
     try {
+        const offer = cachedOffers.find(o => o.id === id);
+        if (offer) assertDocBelongsToCompany(offer, 'offer');
         await deleteDoc(doc(db, "offers", id));
         showToast("Offer deleted successfully");
         renderOffers();
@@ -7055,7 +7145,11 @@ window.bulkDeleteOffers = async () => {
 
     try {
         showToast(`Deleting ${selected.length} offer(s)...`);
-        const promises = selected.map(id => deleteDoc(doc(db, "offers", id)));
+        const promises = selected.map((id) => {
+            const offer = cachedOffers.find(o => o.id === id);
+            if (offer) assertDocBelongsToCompany(offer, 'offer');
+            return deleteDoc(doc(db, "offers", id));
+        });
         await Promise.all(promises);
         showToast(`Successfully deleted ${selected.length} offer(s)`);
         clearOfferSelection();
@@ -7113,7 +7207,7 @@ window.loadPortalSettings = async () => {
     if (!container) return;
     try {
         const cid = currentUserProfile?.companyId;
-        const settingsDocId = cid ? `publicPortal_${cid}` : "publicPortal";
+        const settingsDocId = cid ? companySettingsDocId(cid) : "publicPortal";
         let docSnap = await getDoc(doc(db, "settings", settingsDocId));
         let settingsData = {};
         if (docSnap.exists()) {
@@ -7404,8 +7498,8 @@ window.loadPortalSettings = async () => {
 
             try {
                 const cid = currentUserProfile?.companyId;
-                const settingsDocId = cid ? `publicPortal_${cid}` : "publicPortal";
-                await setDoc(doc(db, "settings", settingsDocId), s);
+                const settingsDocId = cid ? companySettingsDocId(cid) : "publicPortal";
+                await setDoc(doc(db, "settings", settingsDocId), withCompanyId(s, cid || undefined));
                 showToast("Portal Synchronized Successfully");
                 loadPortalSettings();
             } catch (e) {
@@ -7703,14 +7797,14 @@ window.initiateRemoteCall = async (phoneNumber, candidateName) => {
 
     try {
         const callRef = doc(db, "remote_calls", currentUser.uid);
-        await setDoc(callRef, {
+        await setDoc(callRef, withCompanyId({
             phoneNumber: phoneNumber,
             candidateName: candidateName,
             status: 'pending',
             timestamp: serverTimestamp(),
             uid: currentUser.uid,
             email: currentUser.email
-        });
+        }));
         if (typeof showToast === 'function') showToast(`Calling ${candidateName}... Check your phone.`, "success");
         else alert(`Calling ${candidateName}... Check your phone.`);
     } catch (error) {
@@ -8838,7 +8932,8 @@ window.toggleContactStatus = async (id) => {
 
     try {
         const newStatus = !c.isContact;
-        await updateDoc(doc(db, "candidates", id), { isContact: newStatus });
+        assertDocBelongsToCompany(c, 'candidate');
+        await updateDoc(doc(db, "candidates", id), stampOwnedUpdate({ isContact: newStatus }));
         if (c.isContact !== newStatus) {
             c.isContact = newStatus;
         }
@@ -8860,15 +8955,14 @@ window.saveQuickContact = async () => {
     }
 
     try {
-        const data = {
+        const data = stampOwnedCreate({
             name,
             phone,
             email,
             isContact: true,
-            createdAt: serverTimestamp(),
             stage: 'Contact',
             inTalentPool: true
-        };
+        });
         await addDoc(collection(db, 'candidates'), data);
         showToast('Quick contact saved');
         document.getElementById('quick-contact-form').reset();
@@ -8991,14 +9085,14 @@ async function initiateRemoteCall(phoneNumber) {
         }
 
         // Use setDoc with User UID as the document ID for the remote dialer app to listen correctly
-        await setDoc(doc(db, "remote_calls", auth.currentUser.uid), {
+        await setDoc(doc(db, "remote_calls", auth.currentUser.uid), withCompanyId({
             phoneNumber: phoneNumber,
             candidateName: candidateName,
             status: "pending",
             callerName: auth.currentUser?.displayName || "Recruiter",
             callerEmail: auth.currentUser?.email || "unknown",
             timestamp: serverTimestamp()
-        });
+        }));
         showToast("Request sent to Remote Dialer!");
     } catch (e) {
         console.error("Dialer error:", e);
@@ -9368,14 +9462,14 @@ let cachedSources = [];
 
 // Load masters data from Firebase
 async function loadMastersData() {
-    const cid = currentUserProfile?.companyId;
+    const cid = getActiveCompanyId();
     if (!cid) return;
     try {
         const [deptSnap, desigSnap, indSnap, srcSnap] = await Promise.all([
-            getDocs(query(collection(db, 'masters_departments'), where('companyId', '==', cid))),
-            getDocs(query(collection(db, 'masters_designations'), where('companyId', '==', cid))),
-            getDocs(query(collection(db, 'masters_industries'), where('companyId', '==', cid))),
-            getDocs(query(collection(db, 'masters_sources'), where('companyId', '==', cid)))
+            getDocs(companyQuery(db, 'masters_departments', [], cid)),
+            getDocs(companyQuery(db, 'masters_designations', [], cid)),
+            getDocs(companyQuery(db, 'masters_industries', [], cid)),
+            getDocs(companyQuery(db, 'masters_sources', [], cid))
         ]);
 
         cachedDepartments = deptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -9647,19 +9741,18 @@ window.saveDepartment = async () => {
 
     try {
         if (isEdit) {
-            await updateDoc(doc(db, 'masters_departments', data.id), {
+            const row = cachedDepartments.find(d => d.id === data.id);
+            assertDocBelongsToCompany(row, 'department');
+            await updateDoc(doc(db, 'masters_departments', data.id), stampMasterUpdate({
                 name: data.name,
-                description: data.description,
-                updatedAt: serverTimestamp()
-            });
+                description: data.description
+            }));
             showToast('Department updated successfully');
         } else {
-            await addDoc(collection(db, 'masters_departments'), {
+            await addDoc(collection(db, 'masters_departments'), stampMasterCreate({
                 name: data.name,
-                description: data.description,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+                description: data.description
+            }));
             showToast('Department added successfully');
         }
 
@@ -9679,19 +9772,18 @@ window.saveDesignation = async () => {
 
     try {
         if (isEdit) {
-            await updateDoc(doc(db, 'masters_designations', data.id), {
+            const row = cachedDesignations.find(d => d.id === data.id);
+            assertDocBelongsToCompany(row, 'designation');
+            await updateDoc(doc(db, 'masters_designations', data.id), stampMasterUpdate({
                 name: data.name,
-                level: data.level,
-                updatedAt: serverTimestamp()
-            });
+                level: data.level
+            }));
             showToast('Designation updated successfully');
         } else {
-            await addDoc(collection(db, 'masters_designations'), {
+            await addDoc(collection(db, 'masters_designations'), stampMasterCreate({
                 name: data.name,
-                level: data.level,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+                level: data.level
+            }));
             showToast('Designation added successfully');
         }
 
@@ -9711,19 +9803,18 @@ window.saveIndustry = async () => {
 
     try {
         if (isEdit) {
-            await updateDoc(doc(db, 'masters_industries', data.id), {
+            const row = cachedIndustries.find(d => d.id === data.id);
+            assertDocBelongsToCompany(row, 'industry');
+            await updateDoc(doc(db, 'masters_industries', data.id), stampMasterUpdate({
                 name: data.name,
-                sector: data.sector,
-                updatedAt: serverTimestamp()
-            });
+                sector: data.sector
+            }));
             showToast('Industry updated successfully');
         } else {
-            await addDoc(collection(db, 'masters_industries'), {
+            await addDoc(collection(db, 'masters_industries'), stampMasterCreate({
                 name: data.name,
-                sector: data.sector,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+                sector: data.sector
+            }));
             showToast('Industry added successfully');
         }
 
@@ -9743,19 +9834,18 @@ window.saveSource = async () => {
 
     try {
         if (isEdit) {
-            await updateDoc(doc(db, 'masters_sources', data.id), {
+            const row = cachedSources.find(d => d.id === data.id);
+            assertDocBelongsToCompany(row, 'source');
+            await updateDoc(doc(db, 'masters_sources', data.id), stampMasterUpdate({
                 name: data.name,
-                type: data.type,
-                updatedAt: serverTimestamp()
-            });
+                type: data.type
+            }));
             showToast('Source updated successfully');
         } else {
-            await addDoc(collection(db, 'masters_sources'), {
+            await addDoc(collection(db, 'masters_sources'), stampMasterCreate({
                 name: data.name,
-                type: data.type,
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            });
+                type: data.type
+            }));
             showToast('Source added successfully');
         }
 
@@ -9772,6 +9862,8 @@ window.deleteDepartment = async (id) => {
     if (!confirm('Are you sure you want to delete this department?')) return;
 
     try {
+        const row = cachedDepartments.find(d => d.id === id);
+        if (row) assertDocBelongsToCompany(row, 'department');
         await deleteDoc(doc(db, 'masters_departments', id));
         showToast('Department deleted successfully');
         await loadMastersData();
@@ -9785,6 +9877,8 @@ window.deleteDesignation = async (id) => {
     if (!confirm('Are you sure you want to delete this designation?')) return;
 
     try {
+        const row = cachedDesignations.find(d => d.id === id);
+        if (row) assertDocBelongsToCompany(row, 'designation');
         await deleteDoc(doc(db, 'masters_designations', id));
         showToast('Designation deleted successfully');
         await loadMastersData();
@@ -9798,6 +9892,8 @@ window.deleteIndustry = async (id) => {
     if (!confirm('Are you sure you want to delete this industry?')) return;
 
     try {
+        const row = cachedIndustries.find(d => d.id === id);
+        if (row) assertDocBelongsToCompany(row, 'industry');
         await deleteDoc(doc(db, 'masters_industries', id));
         showToast('Industry deleted successfully');
         await loadMastersData();
@@ -9811,6 +9907,8 @@ window.deleteSource = async (id) => {
     if (!confirm('Are you sure you want to delete this source?')) return;
 
     try {
+        const row = cachedSources.find(d => d.id === id);
+        if (row) assertDocBelongsToCompany(row, 'source');
         await deleteDoc(doc(db, 'masters_sources', id));
         showToast('Source deleted successfully');
         await loadMastersData();
@@ -10002,14 +10100,14 @@ window.submitCreateUser = async () => {
     const tmpAuth = getAuth(tmpApp);
     try {
         const cred = await createUserSecondary(tmpAuth, email, tempPass);
-        await setDoc(doc(db, 'users', cred.user.uid), {
+        await setDoc(doc(db, 'users', cred.user.uid), withCompanyId({
             email,
             displayName: displayName || email.split('@')[0],
             role,
             status: 'active',
             createdAt: serverTimestamp(),
             createdBy: auth.currentUser.uid
-        });
+        }));
         await sendPasswordResetEmail(tmpAuth, email);
         showToast('User created. Password setup email sent.');
         closeModal('modal-create-user');
@@ -10198,8 +10296,9 @@ window.runLegacyMigration = async () => {
     const uid = auth.currentUser.uid;
     let total = 0;
     try {
+        const cid = requireActiveCompanyId();
         for (const colName of ['candidates', 'interviews', 'offers']) {
-            const snap = await getDocs(collection(db, colName));
+            const snap = await getDocs(companyQuery(db, colName, [limit(500)], cid));
             let batch = writeBatch(db);
             let ops = 0;
             for (const d of snap.docs) {
@@ -10211,6 +10310,7 @@ window.runLegacyMigration = async () => {
                     updatedBy: uid,
                     updatedAt: serverTimestamp()
                 };
+                if (!data.companyId) patch.companyId = cid;
                 if (!data.createdBy) patch.createdBy = uid;
                 batch.update(d.ref, patch);
                 ops++;
@@ -10262,13 +10362,13 @@ window.generateDialerLoginQR = async () => {
 
     try {
         // Create bridge document
-        await setDoc(doc(db, 'qr_bridges', bridgeId), {
+        await setDoc(doc(db, 'qr_bridges', bridgeId), withCompanyId({
             status: 'pending',
             createdAt: serverTimestamp(),
             expiresAt: expiresAt,
             desktopUid: auth.currentUser.uid,
             desktopEmail: auth.currentUser.email
-        });
+        }));
 
         // Generate QR Code (bridgeId:secret)
         const qrData = `${bridgeId}:${secret}`;
