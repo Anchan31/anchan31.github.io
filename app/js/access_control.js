@@ -95,7 +95,10 @@ export function getTenantFromHost() {
     return RESERVED_HOSTS.has(subdomain) ? "" : subdomain;
 }
 
-export function resolvePlanLimits(subscription = {}, company = {}) {
+export function resolvePlanLimits(subscription, company) {
+    subscription = subscription || {};
+    company = company || {};
+
     const plan = PLAN_CATALOG[subscription.plan || company.plan] || PLAN_CATALOG.starter;
     const customLimits = subscription.customLimits || company.customLimits || {};
     const customFeatures = subscription.customFeatures || company.features;
