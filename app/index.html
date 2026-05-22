@@ -2121,7 +2121,8 @@
                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
                                 <h2 class="text-2xl font-black text-slate-800 dark:text-white">User management</h2>
-                                <p class="text-sm text-slate-500">Provision accounts and roles</p>
+                                <p class="text-sm text-slate-500">Provision accounts and roles · <span id="user-seat-usage" class="font-bold">—</span></p>
+                                <p class="text-xs text-slate-400 mt-1">Owner/Admin: full workspace · Manager: assign team · Recruiter: own pipeline · Viewer: read-only</p>
                             </div>
                             <div class="flex items-center gap-3">
                                 <div class="relative w-full md:w-64">
@@ -3902,9 +3903,10 @@
                 <div>
                     <label class="field-label">Role</label>
                     <select id="create-user-role" class="theme-input w-full">
-                        <option value="recruiter">Recruiter</option>
-                        <option value="manager">Manager</option>
-                        <option value="admin">Admin</option>
+                        <option value="recruiter">Recruiter — own candidates &amp; dialer</option>
+                        <option value="manager">Manager — assign team &amp; all pipelines</option>
+                        <option value="admin">Admin — users, settings, analytics</option>
+                        <option value="viewer">Viewer — read-only</option>
                     </select>
                 </div>
                 <div>
@@ -3950,6 +3952,7 @@
                         <option value="recruiter">Recruiter</option>
                         <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
+                        <option value="viewer">Viewer</option>
                     </select>
                 </div>
                 <div>

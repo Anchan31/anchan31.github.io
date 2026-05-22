@@ -11,8 +11,15 @@ import {
     normalizeClientId,
     resolveTenantClientId,
     getTenantFromHost,
-    getTenantFromQuery
+    getTenantFromQuery,
+    resolvePlanLimits,
+    canAddWorkspaceUser
 } from "./access_control.js";
+import {
+    teamResponsibilityHtml,
+    teamActionButtonsHtml,
+    canModifyRecord
+} from "./team.js";
 import {
     bindTenantProfile,
     getActiveCompanyId,
@@ -161,34 +168,55 @@ function applyRolePermissions(role) {
 }
 
 async function loadUserDirectoryForAssignments() {
-    if (!perm.isManagerUp(userRole())) {
-        try {
-            const self = await getDoc(doc(db, 'users', auth.currentUser.uid));
-            cachedUserDirectory = self.exists() ? [{ id: self.id, ...self.data() }] : [];
-        } catch (e) {
-            cachedUserDirectory = [];
-        }
+    const cid = getActiveCompanyId();
+    if (!cid) {
+        cachedUserDirectory = [];
         populateAssigneeSelects();
         return;
     }
     try {
-        const q = query(
+        const snap = await getDocs(query(
             collection(db, 'users'),
-            where('companyId', '==', currentUserProfile?.companyId || null),
+            where('companyId', '==', cid),
+            where('status', '==', 'active'),
             limit(100)
-        );
-        const snap = await getDocs(q);
-        cachedUserDirectory = snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((u) => u.status === 'active');
+        ));
+        cachedUserDirectory = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (e) {
         console.warn('User directory', e);
         cachedUserDirectory = [];
     }
     populateAssigneeSelects();
+    updateUserSeatUsageBadge();
+}
+
+function updateUserSeatUsageBadge() {
+    const el = document.getElementById('user-seat-usage');
+    if (!el || !window.activeSubscription?.limits?.users) return;
+    const max = window.activeSubscription.limits.users;
+    const used = cachedUserDirectory.length;
+    el.textContent = `${used} / ${max} seats`;
+    el.classList.toggle('text-rose-600', used >= max);
+    el.classList.toggle('text-slate-500', used < max);
+}
+
+function syncWorkspacePlanLimits(company) {
+    if (!company) return;
+    const limits = resolvePlanLimits(null, company);
+    window.activeSubscription = {
+        plan: limits.plan || company.plan || 'starter',
+        status: company.subscriptionStatus || company.status || 'active',
+        limits: {
+            users: limits.maxUsers,
+            jobs: Number(company.maxJobs || company.limits?.jobs || 10)
+        },
+        expiresAt: company.subscriptionExpiresAt || null
+    };
+    updateUserSeatUsageBadge();
 }
 
 function populateAssigneeSelects() {
+    const canAssign = perm.canAssignTeam(userRole());
     const selects = [
         document.getElementById('candidate-assignees'),
         document.getElementById('interview-assignees'),
@@ -196,6 +224,10 @@ function populateAssigneeSelects() {
     ];
     selects.forEach((sel) => {
         if (!sel) return;
+        sel.disabled = !canAssign;
+        if (!canAssign) {
+            sel.title = "Only managers and admins can assign teammates. Use Take ownership / Join task on the record.";
+        }
         const cur = Array.from(sel.selectedOptions).map((o) => o.value);
         sel.innerHTML = '';
         cachedUserDirectory.forEach((u) => {
@@ -484,7 +516,75 @@ window.setAssigneesFromDoc = (prefix, docSnap) => {
 window.collectAssignees = (prefix) => {
     const sel = document.getElementById(`${prefix}-assignees`);
     if (!sel) return [];
+    if (!perm.canAssignTeam(userRole())) {
+        return auth.currentUser?.uid ? [auth.currentUser.uid] : [];
+    }
     return Array.from(sel.selectedOptions).map((o) => o.value).filter(Boolean);
+};
+
+async function patchRecordTeam(collectionName, id, patch) {
+    const snap = await getDoc(doc(db, collectionName, id));
+    if (!snap.exists()) throw new Error("Record not found.");
+    assertDocBelongsToCompany(snap.data(), collectionName);
+    const role = userRole();
+    const uid = auth.currentUser?.uid;
+    if (!canModifyRecord(role, snap.data(), uid) && !perm.canTakeOwnership(role, snap.data(), uid)) {
+        throw new Error("You do not have permission to change responsibility on this record.");
+    }
+    await updateDoc(doc(db, collectionName, id), stampOwnedUpdate(patch));
+    await appendAuditEntry(collectionName, id, 'team', patch);
+}
+
+window.takeRecordOwnership = async (collectionName, id) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+        const snap = await getDoc(doc(db, collectionName, id));
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (!perm.canTakeOwnership(userRole(), data, uid)) {
+            showToast("You cannot take ownership of this record.", "error");
+            return;
+        }
+        const assigned = new Set(Array.isArray(data.assignedTo) ? data.assignedTo : []);
+        assigned.add(uid);
+        await patchRecordTeam(collectionName, id, {
+            ownerId: uid,
+            assignedTo: Array.from(assigned)
+        });
+        showToast("You are now the owner.");
+        notifyCrossTabChange({ type: 'data-update', collection: collectionName, id });
+    } catch (e) {
+        showToast(e.message || "Failed to take ownership", "error");
+    }
+};
+
+window.assignRecordToMe = async (collectionName, id) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+        const snap = await getDoc(doc(db, collectionName, id));
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const assigned = new Set(Array.isArray(data.assignedTo) ? data.assignedTo : []);
+        if (assigned.has(uid)) {
+            showToast("You are already on this team.");
+            return;
+        }
+        if (!perm.isManagerUp(userRole()) && data.ownerId && data.ownerId !== uid) {
+            const alreadyAssigned = assigned.has(uid);
+            if (!alreadyAssigned && !perm.canReadOwnedDoc(userRole(), data, uid)) {
+                showToast("Ask a manager to assign you, or take ownership first.", "error");
+                return;
+            }
+        }
+        assigned.add(uid);
+        await patchRecordTeam(collectionName, id, { assignedTo: Array.from(assigned) });
+        showToast("Added you to the team.");
+        notifyCrossTabChange({ type: 'data-update', collection: collectionName, id });
+    } catch (e) {
+        showToast(e.message || "Failed to join task", "error");
+    }
 };
 
 window.filterAuditForEntity = async (entity, entityId) => {
@@ -1899,12 +1999,7 @@ function setupRealtimeListeners() {
         }
         const company = cachedCompanies[0];
         if (company) {
-            window.activeSubscription = {
-                plan: company.plan || 'starter',
-                status: company.subscriptionStatus || company.status || 'active',
-                limits: company.limits || { users: company.maxUsers || 5, jobs: company.maxJobs || 10 },
-                expiresAt: company.subscriptionExpiresAt || null
-            };
+            syncWorkspacePlanLimits(company);
             const subBadge = document.getElementById('nav-subscription-badge');
             if (subBadge) {
                 subBadge.textContent = String(window.activeSubscription.plan).toUpperCase();
@@ -1927,12 +2022,7 @@ function setupRealtimeListeners() {
         cachedCompanies = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         const company = cachedCompanies[0];
         if (company) {
-            window.activeSubscription = {
-                plan: company.plan || 'starter',
-                status: company.subscriptionStatus || company.status || 'active',
-                limits: company.limits || { users: company.maxUsers || 5, jobs: company.maxJobs || 10 },
-                expiresAt: company.subscriptionExpiresAt || null
-            };
+            syncWorkspacePlanLimits(company);
             const subBadge = document.getElementById('nav-subscription-badge');
             if (subBadge) {
                 subBadge.textContent = String(window.activeSubscription.plan).toUpperCase();
@@ -2705,6 +2795,8 @@ function renderCandidates() {
                                         <a href="mailto:${c.email}" class="hover:text-blue-500 dark:hover:text-blue-400 truncate w-32 inline-block"><i class="fas fa-envelope mr-1"></i>${highlight(c.email, q)}</a>
                                         <a href="https://wa.me/${c.phone ? c.phone.replace(/[^0-9]/g, '') : ''}" target="_blank" class="hover:text-whatsapp"><i class="fab fa-whatsapp mr-1"></i>${highlight(c.phone || 'N/A', q)}</a>
                                     </div>
+                                    ${teamResponsibilityHtml(c, cachedUserDirectory)}
+                                    ${teamActionButtonsHtml('candidates', c.id, c, userRole())}
                                 </div>
                             </div>
                         </td>
@@ -4341,6 +4433,10 @@ document.getElementById('form-candidate').onsubmit = async (e) => {
 window.editCandidate = async (id) => {
     const cand = cachedCandidates.find(c => c.id === id);
     if (!cand) return;
+    if (!canModifyRecord(userRole(), cand, auth.currentUser?.uid)) {
+        showToast("You can only edit candidates you own or are assigned to.", "error");
+        return;
+    }
     const form = document.getElementById('form-candidate');
     if (!form) return;
 
@@ -4679,6 +4775,10 @@ window.syncInterviewCandidateId = (val) => {
 window.editInterview = async (id) => {
     const current = cachedInterviews.find(i => i.id === id);
     if (!current) return;
+    if (!canModifyRecord(userRole(), current, auth.currentUser?.uid)) {
+        showToast("You can only edit interviews you own or are assigned to.", "error");
+        return;
+    }
     const lk = await tryAcquireEditLock('interviews', id);
     applyEditModalLockUI('interview', lk.readOnly, lk.lockedBy);
     const form = document.getElementById('form-interview');
@@ -5677,6 +5777,8 @@ window.deleteDocById = async (col, id) => {
                 'masters_industries', 'masters_sources'
             ]);
             if (tenantCols.has(col)) {
+                const role = userRole();
+                const uid = auth.currentUser?.uid;
                 const cached =
                     col === 'jobs' ? cachedJobs :
                         col === 'candidates' ? cachedCandidates :
@@ -5690,10 +5792,15 @@ window.deleteDocById = async (col, id) => {
                                                         col === 'masters_sources' ? cachedSources :
                                                             null;
                 const row = cached?.find?.((r) => r.id === id);
-                if (row) assertDocBelongsToCompany(row, col);
-                else {
+                let docData = row;
+                if (!docData) {
                     const snap = await getDoc(doc(db, col, id));
-                    if (snap.exists()) assertDocBelongsToCompany(snap.data(), col);
+                    if (!snap.exists()) throw new Error("Record not found.");
+                    docData = snap.data();
+                }
+                assertDocBelongsToCompany(docData, col);
+                if (!perm.canDeleteRecord(role, docData, uid)) {
+                    throw new Error("You can only delete records you own unless you are a manager or admin.");
                 }
             }
             if (col === 'companies' && id !== getActiveCompanyId()) {
@@ -10073,14 +10180,16 @@ window.openCreateUserModal = () => {
 window.submitCreateUser = async () => {
     if (!perm.canManageUsers(userRole())) return;
 
-    // Limit Check
-    if (window.activeSubscription && window.activeSubscription.limits) {
-        // Count active users in this company
-        const userSnap = await getDocs(query(collection(db, 'users'), where('companyId', '==', currentUserProfile.companyId), where('status', '==', 'active')));
-        if (userSnap.size >= window.activeSubscription.limits.users) {
-            showToast(`Limit Reached: Your ${window.activeSubscription.plan} plan only allows ${window.activeSubscription.limits.users} users.`, 'error');
-            return;
-        }
+    const company = cachedCompanies[0];
+    const userSnap = await getDocs(query(
+        collection(db, 'users'),
+        where('companyId', '==', getActiveCompanyId()),
+        where('status', '==', 'active')
+    ));
+    const seatCheck = canAddWorkspaceUser(company, null, userSnap.size);
+    if (!seatCheck.allowed) {
+        showToast(seatCheck.reason, 'error');
+        return;
     }
 
     const email = document.getElementById('create-user-email')?.value?.trim();
@@ -10187,6 +10296,7 @@ window.renderUserManagementTable = async () => {
                 </td>
             </tr>`;
         }).join('') || `<tr><td colspan="4" class="py-12 text-center text-slate-400"><i class="fas fa-search text-4xl mb-2 opacity-20"></i><p>No results for "${searchVal}"</p></td></tr>`;
+        updateUserSeatUsageBadge();
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500 font-bold bg-red-50 rounded-xl">${escapeHtml(e.message)}</td></tr>`;
     }

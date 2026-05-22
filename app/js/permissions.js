@@ -1,6 +1,5 @@
-/** 
- * NEXTGEN RECRUITMENT ECOSYSTEM - RBAC SYNCHRONIZATION
- * This file mirrors the permissions and role definitions from the central Access Portal.
+/**
+ * NEXTGEN RECRUITMENT ECOSYSTEM - RBAC (aligned with subscription plans & team workflows)
  */
 
 export const PERMISSIONS = {
@@ -28,16 +27,34 @@ export const ROLE_DEFINITIONS = {
         label: "Admin",
         permissions: [
             PERMISSIONS.manageUsers,
-            PERMISSIONS.readOnly,
+            PERMISSIONS.manageJobs,
+            PERMISSIONS.manageCandidates,
             PERMISSIONS.viewAnalytics,
             PERMISSIONS.shareProfiles,
-            PERMISSIONS.useDialer
+            PERMISSIONS.useDialer,
+            PERMISSIONS.useQrBridgeLogin
+        ]
+    },
+    manager: {
+        id: "manager",
+        label: "Manager",
+        permissions: [
+            PERMISSIONS.manageJobs,
+            PERMISSIONS.manageCandidates,
+            PERMISSIONS.viewAnalytics,
+            PERMISSIONS.shareProfiles,
+            PERMISSIONS.useDialer,
+            PERMISSIONS.useQrBridgeLogin
         ]
     },
     recruiter: {
         id: "recruiter",
         label: "Recruiter",
-        permissions: Object.values(PERMISSIONS)
+        permissions: [
+            PERMISSIONS.manageCandidates,
+            PERMISSIONS.shareProfiles,
+            PERMISSIONS.useDialer
+        ]
     },
     viewer: {
         id: "viewer",
@@ -46,32 +63,28 @@ export const ROLE_DEFINITIONS = {
     }
 };
 
-/**
- * Checks if a role has a specific permission.
- * @param {string} roleId - The role ID (e.g., 'owner', 'admin').
- * @param {string} permission - The permission key from PERMISSIONS.
- * @returns {boolean}
- */
 export function hasPermission(roleId, permission) {
     const role = ROLE_DEFINITIONS[roleId] || ROLE_DEFINITIONS.viewer;
     return role.permissions.includes(PERMISSIONS.fullAccess) || role.permissions.includes(permission);
 }
 
-/** Legacy support for old functions while migrating to granular RBAC */
 export function isManagerUp(roleId) {
-    return roleId === 'owner' || roleId === 'admin' || roleId === 'manager';
+    return roleId === "owner" || roleId === "admin" || roleId === "manager";
 }
 
 export function isWriter(roleId) {
-    return roleId !== 'viewer';
+    return roleId !== "viewer";
 }
 
 export function canReadOwnedDoc(roleId, doc, uid) {
     if (!doc || !uid) return false;
     if (isManagerUp(roleId)) return true;
-    if (doc.ownerId === uid) return true;
-    const assigned = doc.assignedTo;
-    return Array.isArray(assigned) && assigned.includes(uid);
+    if (hasPermission(roleId, PERMISSIONS.manageCandidates)) {
+        if (doc.ownerId === uid) return true;
+        const assigned = doc.assignedTo;
+        return Array.isArray(assigned) && assigned.includes(uid);
+    }
+    return false;
 }
 
 export function canManageUsers(roleId) {
@@ -86,9 +99,37 @@ export function canViewAudit(roleId) {
     return hasPermission(roleId, PERMISSIONS.viewAnalytics) || isManagerUp(roleId);
 }
 
+/** Managers+ can assign work to any teammate in the workspace. */
+export function canAssignTeam(roleId) {
+    return isManagerUp(roleId);
+}
+
+/** Any writer can take ownership of unowned work; managers can take any record. */
+export function canTakeOwnership(roleId, doc, uid) {
+    if (!isWriter(roleId) || !uid) return false;
+    if (isManagerUp(roleId)) return true;
+    if (!doc?.ownerId || doc.ownerId === uid) return true;
+    const assigned = doc?.assignedTo;
+    return Array.isArray(assigned) && assigned.includes(uid);
+}
+
+export function canDeleteRecord(roleId, doc, uid) {
+    if (!isWriter(roleId)) return false;
+    if (isManagerUp(roleId)) return true;
+    return doc?.ownerId === uid;
+}
+
 export const ROLES = {
+    OWNER: "owner",
     ADMIN: "admin",
     MANAGER: "manager",
     RECRUITER: "recruiter",
     VIEWER: "viewer"
 };
+
+export const ASSIGNABLE_ROLES = [
+    { id: ROLES.RECRUITER, label: "Recruiter" },
+    { id: ROLES.MANAGER, label: "Manager" },
+    { id: ROLES.ADMIN, label: "Admin" },
+    { id: ROLES.VIEWER, label: "Viewer" }
+];

@@ -144,6 +144,20 @@ export function resolveTenantClientId(options = {}) {
     return "";
 }
 
+export function canAddWorkspaceUser(company, subscription, activeUserCount) {
+    const limits = resolvePlanLimits(subscription, company);
+    const maxUsers = Number(limits.maxUsers || 1);
+    if (activeUserCount >= maxUsers) {
+        return {
+            allowed: false,
+            reason: `User limit reached (${activeUserCount}/${maxUsers}) for your ${limits.plan} plan.`,
+            maxUsers,
+            activeUserCount
+        };
+    }
+    return { allowed: true, reason: "", maxUsers, activeUserCount };
+}
+
 export function resolvePlanLimits(subscription, company) {
     subscription = subscription || {};
     company = company || {};
