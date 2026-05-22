@@ -28,23 +28,16 @@ export const ROLE_DEFINITIONS = {
         label: "Admin",
         permissions: [
             PERMISSIONS.manageUsers,
-            PERMISSIONS.manageRoles,
-            PERMISSIONS.manageJobs,
-            PERMISSIONS.manageCandidates,
-            PERMISSIONS.shareProfiles,
             PERMISSIONS.readOnly,
-            PERMISSIONS.viewAnalytics
+            PERMISSIONS.viewAnalytics,
+            PERMISSIONS.shareProfiles,
+            PERMISSIONS.useDialer
         ]
     },
     recruiter: {
         id: "recruiter",
         label: "Recruiter",
-        permissions: [
-            PERMISSIONS.manageCandidates,
-            PERMISSIONS.useDialer,
-            PERMISSIONS.shareProfiles,
-            PERMISSIONS.readOnly
-        ]
+        permissions: Object.values(PERMISSIONS)
     },
     viewer: {
         id: "viewer",

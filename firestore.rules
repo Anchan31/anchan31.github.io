@@ -1,173 +1,378 @@
 rules_version = '2';
+
+// ====================================================================
+// Consolidated Firestore Security Rules
+// Used by both:
+//   - anchan31.github.io (Client Portal & Main Application)
+//   - access.anchan31.github.io (Administrative / Access Portal)
+// ====================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- HELPER FUNCTIONS ---
-    
-    // Checks if the user is authenticated
+
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    // Retrieves the user's profile document from the 'users' collection
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+
+    function isAccessPortalOwner() {
+      return isSignedIn() &&
+        request.auth.token.email in [
+          'nextgenudaan@gmail.com',
+          'it.nextgenudaan@gmail.com'
+        ];
     }
-    
-    // Gets the active user's associated companyId (slug)
+
+    function platformAdminPath() {
+      return /databases/$(database)/documents/platformAdmins/$(request.auth.uid);
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn() &&
+        exists(platformAdminPath()) &&
+        get(platformAdminPath()).data.status == 'active' &&
+        get(platformAdminPath()).data.role == 'owner';
+    }
+
+    function hasFullAccess() {
+      return isAccessPortalOwner() || isPlatformAdmin();
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasUserData() {
+      return isSignedIn() && exists(userPath());
+    }
+
+    function getUserData() {
+      return get(userPath()).data;
+    }
+
     function getUserCompanyId() {
       return getUserData().companyId;
     }
-    
-    // Gets the active user's assigned role
+
     function getUserRole() {
       return getUserData().role;
     }
 
-    // --- COLLECTION RULES ---
-
-    // 1. Settings Collection (Global & Company-Specific Portal Configurations)
-    match /settings/{docId} {
-      // Anyone (public) can read the branding configurations for any domain/tenant
-      allow read: if true;
-      
-      // Only owners or admins can write branding settings, and they can only edit their own company's configurations
-      allow write: if isSignedIn() && 
-                   (getUserRole() == 'owner' || getUserRole() == 'admin') &&
-                   (docId == 'publicPortal' || docId == 'publicPortal_' + getUserCompanyId());
+    function isOwnerOrAdmin() {
+      return hasUserData() &&
+        (getUserRole() == 'owner' || getUserRole() == 'admin');
     }
 
-    // 2. Companies Collection (General Tenant Metadata)
-    match /companies/{companyId} {
-      // General metadata list is readable by anyone to support the Careers layout & Access provisioning
-      allow read: if true;
-      
-      // Only owners/admins can manage company profiles
-      allow write: if isSignedIn() && (getUserRole() == 'owner' || getUserRole() == 'admin');
+    function isCompanyUser(companyId) {
+      return hasUserData() && getUserCompanyId() == companyId;
     }
 
-    // 3. Users Collection (User Profiles and RBAC Permissions)
-    match /users/{uid} {
-      // Users can read their own profile, or other profiles within their same company
-      allow read: if isSignedIn() && (request.auth.uid == uid || getUserCompanyId() == resource.data.companyId);
-      
-      // Authenticated users can auto-provision or create their own initial profile document
-      allow create: if isSignedIn() && request.auth.uid == uid;
-      
-      // Users can update their own details, and owners/admins can manage profiles belonging to their company
-      allow update: if isSignedIn() && (
-        request.auth.uid == uid || 
-        (getUserCompanyId() == resource.data.companyId && (getUserRole() == 'owner' || getUserRole() == 'admin'))
+    function canManageCompany(companyId) {
+      return hasFullAccess() ||
+        (
+          isCompanyUser(companyId) &&
+          (getUserRole() == 'owner' || getUserRole() == 'admin')
+        );
+    }
+
+    function canWorkInCompany(companyId) {
+      return hasFullAccess() ||
+        (
+          isCompanyUser(companyId) &&
+          getUserRole() != 'viewer'
+        );
+    }
+
+    // --- ACCESS PORTAL ADMIN ---
+
+    match /platformAdmins/{uid} {
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        request.auth.uid == uid
       );
-      
-      // Only owners/admins can delete user accounts in their company
-      allow delete: if isSignedIn() && 
-                    getUserCompanyId() == resource.data.companyId && 
-                    (getUserRole() == 'owner' || getUserRole() == 'admin');
+
+      allow create, update: if isSignedIn() && (
+        hasFullAccess() ||
+        (
+          request.auth.uid == uid &&
+          isAccessPortalOwner() &&
+          request.resource.data.email == request.auth.token.email &&
+          request.resource.data.role == 'owner' &&
+          request.resource.data.status == 'active'
+        )
+      );
+
+      allow delete: if hasFullAccess();
     }
 
-    // 4. Jobs Collection (Multi-Tenant Job Openings)
-    match /jobs/{jobId} {
-      // Anyone can read open jobs; otherwise, logged-in company users can read all their own company's jobs
-      allow read: if (resource.data.status == 'Open') || 
-                   (isSignedIn() && getUserCompanyId() == resource.data.companyId);
-      
-      // Owners, admins, and recruiters can manage jobs belonging to their company
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) &&
-                   getUserRole() != 'viewer';
+    match /subscriptions/{id} {
+      allow read, create, update, delete: if hasFullAccess();
     }
 
-    // 5. Candidates Collection (Job Applications & Intake Records)
-    match /candidates/{candidateId} {
-      // Candidates can view their own application, and share pages are publicly readable
+    match /accessPasses/{id} {
+      allow read, create, update, delete: if hasFullAccess();
+    }
+
+    match /roles/{id} {
+      allow read, create, update, delete: if hasFullAccess();
+    }
+
+    match /permissions/{id} {
+      allow read, create, update, delete: if hasFullAccess();
+    }
+
+    match /activityLogs/{id} {
+      allow read, create, update, delete: if hasFullAccess();
+    }
+
+    match /purchaseRequests/{id} {
+      allow read, create, update, delete: if hasFullAccess();
+    }
+
+    // --- SETTINGS ---
+
+    match /settings/{docId} {
       allow read: if true;
-      
-      // Candidates can submit applications publicly
+
+      allow write: if isSignedIn() && (
+        hasFullAccess() ||
+        (
+          isOwnerOrAdmin() &&
+          (
+            docId == 'publicPortal' ||
+            docId == 'publicPortal_' + getUserCompanyId()
+          )
+        )
+      );
+    }
+
+    // --- COMPANIES ---
+
+    match /companies/{companyId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn() && (
+        hasFullAccess() ||
+        isOwnerOrAdmin()
+      );
+    }
+
+    // --- USERS ---
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        request.auth.uid == uid ||
+        (
+          hasUserData() &&
+          getUserCompanyId() == resource.data.companyId
+        )
+      );
+
+      allow create: if isSignedIn() && (
+        hasFullAccess() ||
+        request.auth.uid == uid
+      );
+
+      allow update: if isSignedIn() && (
+        hasFullAccess() ||
+        request.auth.uid == uid ||
+        canManageCompany(resource.data.companyId)
+      );
+
+      allow delete: if isSignedIn() && (
+        hasFullAccess() ||
+        canManageCompany(resource.data.companyId)
+      );
+    }
+
+    // --- JOBS ---
+
+    match /jobs/{jobId} {
+      allow read: if resource.data.status == 'Open' ||
+        hasFullAccess() ||
+        (
+          isSignedIn() &&
+          hasUserData() &&
+          getUserCompanyId() == resource.data.companyId
+        );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
+    }
+
+    // --- CANDIDATES ---
+
+    match /candidates/{candidateId} {
+      allow read: if true;
       allow create: if true;
-      
-      // Only company recruiters and administrators can modify or delete application records for their company
-      allow update, delete: if isSignedIn() && 
-                            (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                            getUserRole() != 'viewer';
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
     }
 
-    // 6. Interviews Collection (Candidate Scheduling)
+    // --- INTERVIEWS ---
+
     match /interviews/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   getUserRole() != 'viewer';
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
     }
 
-    // 7. Offers Collection (Candidate Offer Dispatches)
+    // --- OFFERS ---
+
     match /offers/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   getUserRole() != 'viewer';
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
     }
 
-    // 8. Offer Templates (Company-Wide Offer Content Builders)
+    // --- OFFER TEMPLATES ---
+
     match /offerTemplates/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   (getUserRole() == 'owner' || getUserRole() == 'admin');
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canManageCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canManageCompany(resource.data.companyId);
     }
 
-    // 9. WhatsApp Templates (Outbound Dialer Templates)
+    // --- WHATSAPP TEMPLATES ---
+
     match /whatsappTemplates/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   (getUserRole() == 'owner' || getUserRole() == 'admin');
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canManageCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canManageCompany(resource.data.companyId);
     }
 
-    // 10. Presence Collection (Real-Time Collaborator Signaling)
+    // --- PRESENCE ---
+
     match /presence/{id} {
-      allow read, write: if isSignedIn() && 
-                         (getUserCompanyId() == resource.data.companyId || getUserCompanyId() == request.resource.data.companyId);
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(request.resource.data.companyId)
+      );
+
+      allow update, delete: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
     }
 
-    // 11. Audit Logs Collection (System Activity Tracking)
+    // --- AUDIT LOGS ---
+
     match /audit_logs/{id} {
-      // Only owners/admins can audit company records
-      allow read: if isSignedIn() && 
-                   getUserCompanyId() == resource.data.companyId && 
-                   (getUserRole() == 'owner' || getUserRole() == 'admin');
-      
-      // All authenticated team members can write audit events for their company
-      allow create: if isSignedIn() && getUserCompanyId() == request.resource.data.companyId;
-      
-      // Audit logs are immutable once written
-      allow update, delete: if false;
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        canManageCompany(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(request.resource.data.companyId)
+      );
+
+      allow update, delete: if hasFullAccess();
     }
 
-    // 12. Masters Collections (Organizational Taxonomies)
+    // --- MASTER DATA ---
+
     match /masters_departments/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   getUserRole() != 'viewer';
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
     }
+
     match /masters_designations/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   getUserRole() != 'viewer';
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
     }
+
     match /masters_industries/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   getUserRole() != 'viewer';
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
     }
+
     match /masters_sources/{id} {
-      allow read: if isSignedIn() && getUserCompanyId() == resource.data.companyId;
-      allow write: if isSignedIn() && 
-                   (request.resource == null ? getUserCompanyId() == resource.data.companyId : getUserCompanyId() == request.resource.data.companyId) && 
-                   getUserRole() != 'viewer';
+      allow read: if isSignedIn() && (
+        hasFullAccess() ||
+        isCompanyUser(resource.data.companyId)
+      );
+
+      allow create: if isSignedIn() &&
+        canWorkInCompany(request.resource.data.companyId);
+
+      allow update, delete: if isSignedIn() &&
+        canWorkInCompany(resource.data.companyId);
+    }
+
+    // --- FULL ACCESS PORTAL OWNER CONTROL ---
+    // The two main access portal emails can view, create, edit, and delete every document.
+
+    match /{document=**} {
+      allow read, create, update, delete: if isAccessPortalOwner();
+    }
+
+    // --- DEFAULT DENY ---
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -5,6 +5,7 @@ import {
     collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, query, where, orderBy, writeBatch, limit, runTransaction, startAfter
 } from "./firebase_config.js";
 import * as perm from "./permissions.js";
+import { FEATURES, verifyUserModuleAccess } from "./access_control.js";
 
 
 // PDF.js setup
@@ -87,9 +88,9 @@ function getClientIdFromHost() {
 
 function getRequestedClientId() {
     return normalizeClientId(
+        getClientIdFromHost() ||
         sessionStorage.getItem('tenant_client_id') ||
-        document.getElementById('auth-client-id')?.value ||
-        getClientIdFromHost()
+        document.getElementById('auth-client-id')?.value
     );
 }
 
@@ -1733,6 +1734,30 @@ onAuthStateChanged(auth, async (user) => {
             return;
         }
         sessionStorage.setItem('tenant_client_id', profileClientId);
+
+        const moduleAccess = await verifyUserModuleAccess(db, profile, requestedClientId, FEATURES.recruitModule);
+        if (!moduleAccess.allowed) {
+            sessionStorage.removeItem('tenant_client_id');
+            showError(moduleAccess.reason || 'This workspace cannot access the app.');
+            await signOut(auth);
+            return;
+        }
+
+        // Single session enforcement
+        const tabSessionId = crypto.randomUUID();
+        sessionStorage.setItem('tab_session_id', tabSessionId);
+        try {
+            await setDoc(doc(db, 'users', user.uid), { activeSessionId: tabSessionId }, { merge: true });
+        } catch (e) {
+            console.error('Failed to register session ID', e);
+        }
+
+        onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
+            if (docSnap.exists() && docSnap.data().activeSessionId && docSnap.data().activeSessionId !== tabSessionId) {
+                alert('You have logged in from another tab or device. This session will now be closed.');
+                signOut(auth);
+            }
+        });
 
         currentUser = user;
         currentUserProfile = profile;
@@ -7454,8 +7479,8 @@ function _shareHash(str) {
 window.generateShareLink = async (candidateId) => {
     const secret = 'rshr2026';
     const token = _shareHash(candidateId + ':' + secret);
-    const baseUrl = window.location.href.split('/').slice(0, -2).join('/');
-    const shareUrl = `${baseUrl}/Share/index.html?id=${candidateId}&token=${token}`;
+    const baseUrl = `${window.location.origin}/share`;
+    const shareUrl = `${baseUrl}/index.html?id=${candidateId}&token=${token}`;
     try {
         await navigator.clipboard.writeText(shareUrl);
         showToast('Profile link copied to clipboard!');

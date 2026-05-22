@@ -391,7 +391,8 @@
     </footer>
 
     <script type="module">
-        import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, doc, onSnapshot, updateDoc, serverTimestamp } from "/app/js/firebase_config.js";
+        import { auth, db, onAuthStateChanged, signInWithEmailAndPassword, signOut, doc, getDoc, onSnapshot, updateDoc, serverTimestamp } from "/app/js/firebase_config.js";
+        import { FEATURES, getTenantFromHost, normalizeClientId, verifyUserModuleAccess } from "/app/js/access_control.js";
 
         let swRegistration = null;
         let wakeLock = null;
@@ -458,16 +459,30 @@
         }, { once: true });
 
         // Auth Logic
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
-                document.getElementById('auth-layer').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('auth-layer').classList.add('hidden');
-                    document.getElementById('main-content').classList.remove('hidden');
-                    document.getElementById('user-email').innerText = user.email;
-                }, 700);
-                setupCallListener(user.uid);
-                requestWakeLock();
+                const errEl = document.getElementById('error-msg');
+                try {
+                    const profileSnap = await getDoc(doc(db, 'users', user.uid));
+                    const profile = profileSnap.exists() ? { id: profileSnap.id, ...profileSnap.data() } : null;
+                    const requestedClientId = getTenantFromHost() || normalizeClientId(profile?.companyId || profile?.clientId || profile?.subdomain);
+                    const access = await verifyUserModuleAccess(db, profile, requestedClientId, FEATURES.dialer);
+                    if (!access.allowed) throw new Error(access.reason || 'Dialer access is not enabled for this workspace.');
+
+                    sessionStorage.setItem('tenant_client_id', requestedClientId);
+                    document.getElementById('auth-layer').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('auth-layer').classList.add('hidden');
+                        document.getElementById('main-content').classList.remove('hidden');
+                        document.getElementById('user-email').innerText = user.email;
+                    }, 700);
+                    setupCallListener(user.uid);
+                    requestWakeLock();
+                } catch (err) {
+                    errEl.innerText = err.message;
+                    errEl.classList.remove('hidden');
+                    await signOut(auth);
+                }
             } else {
                 document.getElementById('auth-layer').classList.remove('hidden');
                 document.getElementById('auth-layer').style.opacity = '1';

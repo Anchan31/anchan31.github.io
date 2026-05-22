@@ -427,6 +427,74 @@
         }
         function fmt(n) { return Number(n || 0).toLocaleString('en-IN'); }
 
+        const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['trialing', 'active', 'grace']);
+        const RESERVED_HOSTS = new Set(['anchan31', 'access', 'app', 'candidate', 'careers', 'dialer', 'share', 'nextgenudaan', 'www', 'localhost', '127']);
+
+        function normalizeClientId(value = '') {
+            return value.toString().toLowerCase().trim()
+                .replace(/\s+/g, '-')
+                .replace(/[^\w-]+/g, '')
+                .replace(/--+/g, '-')
+                .replace(/^-+/, '')
+                .replace(/-+$/, '');
+        }
+
+        function getTenantFromHost() {
+            const host = window.location.hostname.toLowerCase();
+            if (!host || host === 'localhost' || host === '127.0.0.1') return '';
+            const parts = host.split('.');
+            if (parts.length < 3) return '';
+            const subdomain = normalizeClientId(parts[0]);
+            return RESERVED_HOSTS.has(subdomain) ? '' : subdomain;
+        }
+
+        function subscriptionUsable(subscription) {
+            if (!subscription || !ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)) return false;
+            const expiry = subscription.currentPeriodEnd || subscription.trialEndsAt || subscription.expiresAt;
+            if (!expiry) return true;
+            const expiryDate = expiry.seconds ? new Date(expiry.seconds * 1000) : new Date(expiry);
+            if (Number.isNaN(expiryDate.getTime())) return true;
+            const graceDays = Number(subscription.gracePeriodDays || 0);
+            expiryDate.setDate(expiryDate.getDate() + graceDays);
+            return expiryDate >= new Date();
+        }
+
+        async function loadCompanyByClientId(clientId) {
+            const direct = await db.collection('companies').doc(clientId).get();
+            if (direct.exists) return { id: direct.id, ...direct.data() };
+
+            for (const field of ['companyId', 'clientId', 'subdomain']) {
+                const snap = await db.collection('companies').where(field, '==', clientId).limit(1).get();
+                if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+            }
+            return null;
+        }
+
+        async function requireShareAccess(candidate) {
+            const candidateClientId = normalizeClientId(candidate.companyId || candidate.clientId || candidate.subdomain);
+            const hostClientId = getTenantFromHost();
+            if (hostClientId && hostClientId !== candidateClientId) {
+                throw new Error('This share link belongs to another workspace.');
+            }
+            if (!candidateClientId) return;
+
+            const company = await loadCompanyByClientId(candidateClientId);
+            if (!company) throw new Error('Workspace not found.');
+            if (company.status !== 'active') throw new Error('Workspace is inactive.');
+
+            const subscriptionId = company.subscriptionId;
+            const subscriptionSnap = subscriptionId ? await db.collection('subscriptions').doc(subscriptionId).get() : null;
+            const subscription = subscriptionSnap && subscriptionSnap.exists ? subscriptionSnap.data() : null;
+            if (!subscriptionUsable(subscription)) throw new Error('Share portal subscription is inactive.');
+
+            const features = Array.isArray(subscription.customFeatures) && subscription.customFeatures.length
+                ? subscription.customFeatures
+                : Array.isArray(company.features) && company.features.length
+                    ? company.features
+                    : ['recruitModule', 'careerPortal', 'shareProfile', 'dialer', 'qrBridgeLogin', 'advancedAnalytics'];
+            if (!features.includes('shareProfile')) throw new Error('Share portal is not enabled for this workspace.');
+        }
+
         function isInlineViewable(url) {
             if (!url) return false;
             const lower = url.toLowerCase().split('?')[0];
@@ -448,6 +516,7 @@
                 const snap = await db.collection('candidates').doc(id).get();
                 if (!snap.exists) throw new Error('Not found');
                 const c = snap.data();
+                await requireShareAccess(c);
 
                 // Fetch portal settings dynamically based on candidate's companyId
                 await fetchPortalSettings(c.companyId);

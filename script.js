@@ -262,19 +262,21 @@ function subscribeNow(planId, planName) {
 async function processSubscription(userDetails) {
     try {
         const { name, email, company, mobile, planId, planName } = userDetails;
+        const planSlug = planId === 'plan_SoAKfnYYCTZHDo' ? 'professional' : planId === 'plan_SouJvWzj8xFSgg' ? 'enterprise' : 'starter';
+        const planFeatures = ['recruitModule', 'careerPortal', 'shareProfile', 'dialer', 'qrBridgeLogin', 'advancedAnalytics'];
 
         // Calculate start_at exactly 14 days from now for a 14-days trial
         const now = new Date();
         const trialEndDate = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
         const startAt = Math.floor(trialEndDate.getTime() / 1000); // Unix timestamp in seconds
 
-        // STEP 1: Create Subscription on the Backend (Billed for 3 months)
+        // STEP 1: Create Subscription on the Backend (monthly after the trial)
         const subResponse = await fetch('/api/create-subscription', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 plan_id: planId,
-                total_count: 3, // Billed for 3 months
+                total_count: 12,
                 start_at: startAt,
                 notes: {
                     plan_name: planName,
@@ -302,7 +304,7 @@ async function processSubscription(userDetails) {
         const options = {
             "key": "rzp_live_SqYugAybXREdik",
             "subscription_id": subData.subscription_id,
-            "description": `${planName} Plan — 14-Days Trial + 3-Month Sub`,
+            "description": `${planName} Plan - 14-day trial, then monthly billing`,
             "handler": async function (response) {
                 try {
                     if (db) {
@@ -315,11 +317,37 @@ async function processSubscription(userDetails) {
                             mobile: mobile,
                             plan_id: planId,
                             plan_name: planName,
+                            plan: planSlug,
+                            features: planFeatures,
                             created_at: firebase.firestore.FieldValue.serverTimestamp(),
-                            status: "active"
+                            status: "active",
+                            trialEndsAt: trialEndDate.toISOString()
                         });
                     } else {
                         console.warn("Firebase not initialized or available.");
+                    }
+
+                    // Auto-Provision Workspace
+                    try {
+                        const provisionResponse = await fetch('/api/provision', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                subscriptionId: response.razorpay_subscription_id,
+                                name: name,
+                                email: email,
+                                company: company,
+                                mobile: mobile,
+                                planId: planId,
+                                planName: planName
+                            })
+                        });
+                        const provisionData = await provisionResponse.json();
+                        if (provisionData.success) {
+                            alert(`🎉 Workspace Provisioned Successfully!\n\nSubdomain: ${provisionData.subdomain}.nextgenudaan.in/app\nEmail: ${provisionData.email}\nTemp Password: ${provisionData.tempPassword}\n\nPlease save these credentials!`);
+                        }
+                    } catch (provErr) {
+                        console.error('Auto-Provisioning Error:', provErr);
                     }
 
                     // Redirect to Success Page
