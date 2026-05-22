@@ -108,8 +108,11 @@ export function resolvePlanLimits(subscription = {}, company = {}) {
     };
 }
 
-export function isSubscriptionUsable(subscription) {
-    if (!subscription || !ACTIVE_STATUSES.has(subscription.status)) return false;
+export function isSubscriptionUsable(subscription, company = null) {
+    if (!subscription) {
+        return company?.status === "active";
+    }
+    if (!ACTIVE_STATUSES.has(subscription.status)) return false;
 
     const expiry = subscription.currentPeriodEnd || subscription.trialEndsAt || subscription.expiresAt;
     if (!expiry) return true;
@@ -152,13 +155,27 @@ export async function loadTenantAccess(db, clientId) {
     }
 
     const subscriptionId = company.subscriptionId;
-    const subscriptionSnap = subscriptionId ? await getDoc(doc(db, "subscriptions", subscriptionId)) : null;
-    const subscription = subscriptionSnap?.exists() ? { id: subscriptionSnap.id, ...subscriptionSnap.data() } : null;
+    let subscription = null;
+    if (subscriptionId) {
+        try {
+            const subscriptionSnap = await getDoc(doc(db, "subscriptions", subscriptionId));
+            if (subscriptionSnap?.exists()) {
+                subscription = { id: subscriptionSnap.id, ...subscriptionSnap.data() };
+            }
+        } catch (err) {
+            if (err.code === "permission-denied" || err.message?.includes("permission-denied")) {
+                console.warn("Public portal cannot read subscription document; falling back to company metadata.", err.message || err);
+                subscription = null;
+            } else {
+                throw err;
+            }
+        }
+    }
 
     if (company.status !== "active") {
         return { allowed: false, company, subscription, reason: "Workspace is inactive." };
     }
-    if (!isSubscriptionUsable(subscription)) {
+    if (!isSubscriptionUsable(subscription, company)) {
         return { allowed: false, company, subscription, reason: blockedReason(subscription) };
     }
 
@@ -166,7 +183,7 @@ export async function loadTenantAccess(db, clientId) {
 }
 
 export function tenantHasFeature(company, subscription, featureKey) {
-    if (!company || company.status !== "active" || !isSubscriptionUsable(subscription)) return false;
+    if (!company || company.status !== "active" || !isSubscriptionUsable(subscription, company)) return false;
     return resolvePlanLimits(subscription, company).features.includes(featureKey);
 }
 

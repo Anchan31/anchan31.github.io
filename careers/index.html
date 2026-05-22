@@ -1894,8 +1894,23 @@
                             }
                         }).catch(err => console.warn("Fallback settings load error:", err));
                     }
-                }, (error) => {
-                    console.warn("Could not read portal settings (Permission Denied). Guest users might not see filtered jobs.", error.code);
+                }, async (error) => {
+                    console.warn("Could not read portal settings. Guest users might not see filtered jobs.", error.code);
+                    if (cid && error.code === 'permission-denied') {
+                        try {
+                            const fallbackSnap = await getDoc(doc(db, "settings", "publicPortal"));
+                            if (fallbackSnap.exists()) {
+                                portalSettings = fallbackSnap.data();
+                                applySettings();
+                                if (typeof applyJobFilters === 'function') {
+                                    applyJobFilters();
+                                }
+                                return;
+                            }
+                        } catch (fallbackError) {
+                            console.warn("Fallback settings load error:", fallbackError);
+                        }
+                    }
                     if (typeof applyJobFilters === 'function') {
                         applyJobFilters(); // fallback to unfiltered jobs if blocked
                     }
