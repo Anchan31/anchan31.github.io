@@ -2412,7 +2412,7 @@
             const access = await ensureCareerPortalAccess();
             if (!access.allowed) return;
             fetchJobs();
-            fetchCompanies();
+            await fetchCompanies();
             if (currentUser) {
                 fetchApplications();
                 document.getElementById('tab-apps').classList.remove('hidden');
@@ -2505,7 +2505,7 @@
             subscribeToJobs();
         };
 
-        const fetchCompanies = () => {
+        const fetchCompanies = async () => {
             const cid = await resolveCompanyId();
             if (cid) {
                 // Hide companies tab and pane in single-tenant mode
