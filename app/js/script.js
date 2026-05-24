@@ -49,7 +49,7 @@ let presenceUnsub = null;
 let presenceHeartbeat = null;
 let activeEditLock = null;
 let currentLockContext = null;
-let auditUnsub = null;
+let themeMediaQueryListenerSet = false;
 let cachedCompanies = [];
 let cachedJobs = [];
 let cachedCandidates = [];
@@ -123,7 +123,8 @@ function syncThemeUi() {
     if (statusEl) {
         statusEl.innerText = saved === 'system' ? 'Auto' : saved === 'dark' ? 'Dark' : 'Light';
     }
-    try {
+    if (!themeMediaQueryListenerSet) {
+        themeMediaQueryListenerSet = true;
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
         mq.addEventListener?.('change', (e) => {
             if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
@@ -134,7 +135,7 @@ function syncThemeUi() {
                 if (statusEl2) statusEl2.innerText = 'Auto';
             }
         });
-    } catch (e) { /* ignore */ }
+    }
 }
 
 function applyRolePermissions(role) {
@@ -399,13 +400,6 @@ function subscribePresencePeers() {
     } catch (e) { console.warn('presence sub failed', e); }
 }
 
-function subscribeAuditFeed() {
-    if (auditUnsub) {
-        try { auditUnsub(); } catch (e) { /* noop */ }
-        auditUnsub = null;
-    }
-}
-
 function timeAgo(date) {
     const seconds = Math.floor((new Date() - date) / 1000);
     let interval = seconds / 31536000;
@@ -505,12 +499,6 @@ window.assignRecordToMe = async (collectionName, id) => {
         showToast(e.message || "Failed to join task", "error");
     }
 };
-
-window.filterAuditForEntity = async () => {
-    const box = document.getElementById('record-audit-body');
-    if (box) box.innerHTML = '';
-};
-
 
 window.filterOffersByStatus = (status) => {
     currentOfferFilter = status;
@@ -1041,10 +1029,6 @@ function stopPresenceSession() {
     if (presenceUnsub) {
         try { presenceUnsub(); } catch (e) { /* noop */ }
         presenceUnsub = null;
-    }
-    if (auditUnsub) {
-        try { auditUnsub(); } catch (e) { /* noop */ }
-        auditUnsub = null;
     }
     if (currentUser && auth.currentUser) {
         try {
@@ -3791,7 +3775,6 @@ window.editCandidate = async (id) => {
     document.getElementById('modal-candidate-title').innerText = "Edit Candidate Profile";
     populateAssigneeSelects();
     setAssigneesFromDoc('candidate', cand);
-    if (typeof filterAuditForEntity === 'function') filterAuditForEntity('candidates', id);
     openModal('modal-candidate');
 };
 
@@ -4057,7 +4040,6 @@ window.editInterview = async (id) => {
     document.getElementById('modal-interview-title').innerText = "Manage Interview & Feedback";
     populateAssigneeSelects();
     setAssigneesFromDoc('interview', current);
-    if (typeof filterAuditForEntity === 'function') filterAuditForEntity('interviews', id);
     openModal('modal-interview');
 };
 
@@ -4426,17 +4408,6 @@ window.fetchInterviewsReport = () => {
         };
     });
     exportToExcel(data, "Interviews_Report", "Interviews");
-};
-
-window.fetchTemplatesReport = () => {
-    const data = cachedWaTemplates.map(t => ({
-        "Template Name": t.name || "N/A",
-        "Category / Type": t.type || "N/A",
-        "Content": t.content || "N/A",
-        "Created Date": t.createdAt ? new Date(t.createdAt.seconds * 1000).toLocaleDateString() : "N/A",
-        "Last Updated": t.updatedAt ? new Date(t.updatedAt.seconds * 1000).toLocaleDateString() : "N/A"
-    }));
-    exportToExcel(data, "Messaging_Templates_Report", "Templates");
 };
 
 // --- RESUME PREVIEWER LOGIC ---
@@ -5007,17 +4978,6 @@ window.fetchInterviewsReport = () => {
         };
     });
     exportToExcel(data, "Interviews_Report", "Interviews");
-};
-
-window.fetchTemplatesReport = () => {
-    const data = cachedWaTemplates.map(t => ({
-        "Template Name": t.name || "N/A",
-        "Category / Type": t.type || "N/A",
-        "Content": t.content || "N/A",
-        "Created Date": t.createdAt ? new Date(t.createdAt.seconds * 1000).toLocaleDateString() : "N/A",
-        "Last Updated": t.updatedAt ? new Date(t.updatedAt.seconds * 1000).toLocaleDateString() : "N/A"
-    }));
-    exportToExcel(data, "Messaging_Templates_Report", "Templates");
 };
 
 
@@ -7985,29 +7945,6 @@ const mapCandidateForAudit = (c) => {
         "Why Changing": c.whyChangeJob || "N/A",
         "Added Date": c.createdAt ? new Date(c.createdAt.seconds * 1000).toLocaleDateString() : "N/A"
     };
-};
-
-/**
- * MASTER RECRUITMENT AUDIT
- * Exports EVERY candidate in the system with their assigned segment.
- */
-window.fetchMasterAuditReport = () => {
-    if (cachedCandidates.length === 0) return showToast("No data to export.", "warning");
-    const data = cachedCandidates.map(mapCandidateForAudit);
-    exportToExcel(data, "Master_Portfolio_Audit", "All Candidates");
-};
-
-/**
- * ACTIVE PIPELINE SNAPSHOT
- * Exports only candidates currently in progress (not Hired or in Talent Pool).
- */
-window.fetchPipelineSnapshotReport = () => {
-    const rejectedStages = ['REJECTED', 'Rejected', 'Backed Out', 'Not Interested', 'Applied'];
-    const active = cachedCandidates.filter(c => !c.inTalentPool && c.stage !== 'Hired' && !rejectedStages.includes(c.stage));
-
-    if (active.length === 0) return showToast("No active pipeline data.", "info");
-    const data = active.map(mapCandidateForAudit);
-    exportToExcel(data, "Active_Pipeline_Snapshot", "Pipeline Tracker");
 };
 
 /**

@@ -473,8 +473,11 @@
         async function requireShareAccess(candidate) {
             const candidateClientId = normalizeClientId(candidate.companyId || candidate.clientId || candidate.subdomain);
             const hostClientId = getTenantFromHost();
-            if (hostClientId && hostClientId !== candidateClientId) {
-                throw new Error('This share link belongs to another workspace.');
+            if (hostClientId) {
+                const hostCompany = await loadCompanyByClientId(hostClientId);
+                if (hostCompany && hostCompany.id !== candidateClientId) {
+                    throw new Error('This share link belongs to another workspace.');
+                }
             }
             if (!candidateClientId) return;
 

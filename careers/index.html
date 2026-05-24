@@ -1712,7 +1712,7 @@
             initializeFirestore, persistentLocalCache, persistentSingleTabManager,
             collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, query, where, orderBy
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { FEATURES, verifyTenantModule } from "/app/js/access_control.js";
+        import { FEATURES, verifyTenantModule, loadCompanyByClientId, normalizeClientId } from "/app/js/access_control.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDKuFUJyHUl5AIFSFHCg-4S_wadsha6Et4",
@@ -1743,9 +1743,30 @@
             const parts = hostname.split('.');
             if (parts.length > 2) {
                 const sub = parts[0].toLowerCase();
-                if (sub !== 'www' && sub !== 'anchan31' && sub !== 'nextgenudaan' && sub !== 'localhost') {
+                if (sub !== 'www' && sub !== 'anchan31' && sub !== 'nextgenudaan' && sub !== 'localhost' && sub !== '127') {
                     return sub;
                 }
+            }
+            return null;
+        };
+
+        const resolveCompanyId = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const param = urlParams.get('companyId') || urlParams.get('company') || urlParams.get('cid');
+            if (param) {
+                const company = await loadCompanyByClientId(param);
+                return company ? company.id : normalizeClientId(param);
+            }
+
+            const hostname = window.location.hostname.toLowerCase();
+            const parts = hostname.split('.');
+            if (parts.length > 2) {
+                const sub = normalizeClientId(parts[0]);
+                if (['www', 'anchan31', 'nextgenudaan', 'localhost', '127'].includes(sub)) {
+                    return null;
+                }
+                const company = await loadCompanyByClientId(sub);
+                return company ? company.id : null;
             }
             return null;
         };
@@ -1798,7 +1819,7 @@
         };
 
         const ensureCareerPortalAccess = async () => {
-            const cid = getCompanyId();
+            const cid = await resolveCompanyId();
             if (!cid) {
                 portalAccessState = { checked: true, allowed: true, reason: "" };
                 return portalAccessState;
@@ -2412,9 +2433,9 @@
         let jobsUnsubscribe = null;
         let initialJobChecked = false;
 
-        const subscribeToJobs = () => {
+        const subscribeToJobs = async () => {
             if (jobsUnsubscribe) return; // Prevent multiple listeners
-            const cid = getCompanyId();
+            const cid = await resolveCompanyId();
             const q = cid
                 ? query(collection(db, "jobs"), where("status", "==", "Open"), where("companyId", "==", cid))
                 : query(collection(db, "jobs"), where("status", "==", "Open"));
@@ -2485,7 +2506,7 @@
         };
 
         const fetchCompanies = () => {
-            const cid = getCompanyId();
+            const cid = await resolveCompanyId();
             if (cid) {
                 // Hide companies tab and pane in single-tenant mode
                 const tabCompanies = document.getElementById('tab-companies');
@@ -2899,7 +2920,7 @@
 
             // Header Info
             document.getElementById('app-job-title').innerText = job.title;
-            let companyName = job.company || portalSettings?.companyName || portalSettings?.brandName || "Brawn Laboratories Ltd";
+            let companyName = job.company || cachedCompanies.find(c => c.id === job.companyId)?.name || portalSettings?.companyName || portalSettings?.brandName || "Brawn Laboratories Ltd";
             document.getElementById('app-company').innerText = companyName;
             document.getElementById('app-date').innerText = `Applied on ${new Date(app.appliedAt?.seconds * 1000 || Date.now()).toLocaleDateString()}`;
 
@@ -3107,7 +3128,7 @@
                 const hasMoreSkills = skillsArr.length > 5 ? `<span class="px-2 py-1 text-slate-400 text-[10px] font-bold">+${skillsArr.length - 5} more</span>` : '';
 
                 // Try to get company name
-                let companyName = job.company;
+                let companyName = job.company || cachedCompanies.find(c => c.id === job.companyId)?.name;
                 if (!companyName && window.portalSettings) {
                     companyName = window.portalSettings.companyName || window.portalSettings.companyPrompt || window.portalSettings.brandName;
                 }
