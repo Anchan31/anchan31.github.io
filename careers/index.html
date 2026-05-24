@@ -1894,7 +1894,7 @@
             try {
                 const access = await ensureCareerPortalAccess();
                 if (!access.allowed) return;
-                const cid = getCompanyId();
+                const cid = await resolveCompanyId();
                 const settingsDocId = cid ? `publicPortal_${cid}` : "publicPortal";
                 onSnapshot(doc(db, "settings", settingsDocId), (docSnap) => {
                     if (docSnap.exists()) {
