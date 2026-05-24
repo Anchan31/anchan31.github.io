@@ -348,14 +348,14 @@
         const fetchPortalSettings = async (companyId) => {
             try {
                 const settingsDocId = companyId ? `publicPortal_${companyId}` : 'publicPortal';
-                let docSnap = await getDoc(doc(db, 'settings', settingsDocId));
-                if (docSnap.exists()) {
+                let docSnap = await db.collection('settings').doc(settingsDocId).get();
+                if (docSnap.exists) {
                     portalSettings = docSnap.data();
                     applySettings();
                 } else if (companyId) {
                     // Fallback to global
-                    docSnap = await getDoc(doc(db, 'settings', 'publicPortal'));
-                    if (docSnap.exists()) {
+                    docSnap = await db.collection('settings').doc('publicPortal').get();
+                    if (docSnap.exists) {
                         portalSettings = docSnap.data();
                         applySettings();
                     }
@@ -460,12 +460,11 @@
         }
 
         async function loadCompanyByClientId(clientId) {
-            const direct = await getDoc(doc(db, 'companies', clientId));
-            if (direct.exists()) return { id: direct.id, ...direct.data() };
+            const direct = await db.collection('companies').doc(clientId).get();
+            if (direct.exists) return { id: direct.id, ...direct.data() };
 
             for (const field of ['companyId', 'clientId', 'subdomain']) {
-                const q = query(collection(db, 'companies'), where(field, '==', clientId), limit(1));
-                const snap = await getDocs(q);
+                const snap = await db.collection('companies').where(field, '==', clientId).limit(1).get();
                 if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
             }
             return null;
@@ -487,8 +486,8 @@
             if (company.status !== 'active') throw new Error('Workspace is inactive.');
 
             const subscriptionId = company.subscriptionId;
-            const subscriptionSnap = subscriptionId ? await getDoc(doc(db, 'subscriptions', subscriptionId)) : null;
-            const subscription = subscriptionSnap && subscriptionSnap.exists() ? subscriptionSnap.data() : null;
+            const subscriptionSnap = subscriptionId ? await db.collection('subscriptions').doc(subscriptionId).get() : null;
+            const subscription = subscriptionSnap && subscriptionSnap.exists ? subscriptionSnap.data() : null;
             if (!subscriptionUsable(subscription)) throw new Error('Share portal subscription is inactive.');
 
             const features = Array.isArray(subscription.customFeatures) && subscription.customFeatures.length
@@ -517,8 +516,8 @@
             }
 
             try {
-                const snap = await getDoc(doc(db, 'candidates', id));
-                if (!snap.exists()) throw new Error('Not found');
+                const snap = await db.collection('candidates').doc(id).get();
+                if (!snap.exists) throw new Error('Not found');
                 const c = snap.data();
                 await requireShareAccess(c);
 
@@ -530,14 +529,13 @@
 
                 if (!jobTitle && c.jobId) {
                     try {
-                        const jSnap = await getDoc(doc(db, 'jobs', c.jobId));
-                        if (jSnap.exists() && jSnap.data().title) {
+                        const jSnap = await db.collection('jobs').doc(c.jobId).get();
+                        if (jSnap.exists && jSnap.data().title) {
                             jobTitle = jSnap.data().title;
                         } else if (!looksLikeDocId(c.jobId)) {
                             jobTitle = c.jobId;
                         } else {
-                            const q = query(collection(db, 'jobs'), where('title', '==', c.jobId), limit(1));
-                            const qSnap = await getDocs(q);
+                            const qSnap = await db.collection('jobs').where('title', '==', c.jobId).limit(1).get();
                             if (!qSnap.empty) jobTitle = qSnap.docs[0].data().title || '';
                         }
                     } catch (_) { }
