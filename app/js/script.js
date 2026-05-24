@@ -13,7 +13,6 @@ import {
     getTenantFromHost,
     getTenantFromQuery,
     resolvePlanLimits,
-    canAddWorkspaceUser
 } from "./access_control.js";
 import {
     teamResponsibilityHtml,
@@ -34,16 +33,12 @@ import {
 } from "./tenant_store.js";
 
 
-// PDF.js setup
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
 // --- STATE MANAGEMENT ---
 let currentUser = null;
 /** @type {{ role: string, displayName?: string, status?: string, email?: string, companyId?: string } | null} */
 let currentUserProfile = null;
 bindTenantProfile(() => currentUserProfile);
 let cachedUserDirectory = [];
-let myPipelineOnly = false;
 let _candidatesOwner = [];
 let _candidatesAssigned = [];
 let _interviewsOwner = [];
@@ -60,16 +55,7 @@ let cachedJobs = [];
 let cachedCandidates = [];
 let cachedInterviews = [];
 let cachedOffers = []; // added back
-let cachedOfferTemplates = [];
-let selectedOfferTemplateId = null;
 let currentOfferFilter = 'all';
-
-let currentOfferTemplateMapperId = null;
-let currentOfferTemplateMapperEntries = {}; // key -> {x,y,size}
-let currentMapperPageDim = { width: 0, height: 0 };
-let currentMapperDisplayDim = { width: 0, height: 0 };
-let currentMapperScale = 1;
-let currentMapperSelectedField = '';
 
 // --- RBAC & COLLABORATION HELPERS ---
 
@@ -123,26 +109,35 @@ function recomputeOwnedCaches() {
     }
 }
 
-function filterPipelineRows(rows) {
-    if (!myPipelineOnly || !auth.currentUser) return rows;
-    const uid = auth.currentUser.uid;
-    return rows.filter((r) => r.ownerId === uid || (Array.isArray(r.assignedTo) && r.assignedTo.includes(uid)));
-}
+// My-pipeline feature removed; pipeline filtering by owner is disabled.
 
-function applyMyPipelineIfNeeded(list) {
-    if (!isElevatedRole() || !myPipelineOnly) return list;
-    return filterPipelineRows(list);
+function syncThemeUi() {
+    const saved = localStorage.getItem('theme') || 'system';
+    let actual = saved;
+    if (saved === 'system') {
+        actual = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    document.documentElement.classList.toggle('dark', actual === 'dark');
+    document.documentElement.setAttribute('data-theme', actual);
+    const statusEl = document.getElementById('theme-status');
+    if (statusEl) {
+        statusEl.innerText = saved === 'system' ? 'Auto' : saved === 'dark' ? 'Dark' : 'Light';
+    }
+    try {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener?.('change', (e) => {
+            if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
+                const newTheme = e.matches ? 'dark' : 'light';
+                document.documentElement.classList.toggle('dark', newTheme === 'dark');
+                document.documentElement.setAttribute('data-theme', newTheme);
+                const statusEl2 = document.getElementById('theme-status');
+                if (statusEl2) statusEl2.innerText = 'Auto';
+            }
+        });
+    } catch (e) { /* ignore */ }
 }
 
 function applyRolePermissions(role) {
-    const adminOnly = ['menu-item-usermgmt', 'menu-item-activity'];
-    adminOnly.forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) {
-            const show = perm.canManageUsers(role);
-            el.classList.toggle('hidden', !show);
-        }
-    });
     const managerNavIds = ['btn-nav-portalsettings', 'btn-nav-masters'];
     managerNavIds.forEach((id) => {
         const el = document.getElementById(id);
@@ -150,21 +145,9 @@ function applyRolePermissions(role) {
     });
     const reportsBtn = document.getElementById('btn-nav-reports');
     if (reportsBtn) reportsBtn.classList.toggle('hidden', role === perm.ROLES.VIEWER);
-    const pdffiller = document.getElementById('btn-nav-pdffiller');
-    if (pdffiller) pdffiller.classList.toggle('hidden', !perm.canEditSharedData(role));
-    const pipelineToggle = document.getElementById('my-pipeline-toggle-wrap');
-    if (pipelineToggle) {
-        const show = isElevatedRole();
-        pipelineToggle.classList.toggle('hidden', !show);
-        pipelineToggle.classList.toggle('flex', show);
-    }
+    // pipeline toggle removed
 
-    // Initialize Theme Status Text
-    const currentTheme = localStorage.getItem('theme') || 'system';
-    const statusEl = document.getElementById('theme-status');
-    if (statusEl) {
-        statusEl.innerText = currentTheme === 'system' ? 'Auto' : currentTheme === 'dark' ? 'Dark' : 'Light';
-    }
+    syncThemeUi();
 }
 
 async function loadUserDirectoryForAssignments() {
@@ -187,17 +170,6 @@ async function loadUserDirectoryForAssignments() {
         cachedUserDirectory = [];
     }
     populateAssigneeSelects();
-    updateUserSeatUsageBadge();
-}
-
-function updateUserSeatUsageBadge() {
-    const el = document.getElementById('user-seat-usage');
-    if (!el || !window.activeSubscription?.limits?.users) return;
-    const max = window.activeSubscription.limits.users;
-    const used = cachedUserDirectory.length;
-    el.textContent = `${used} / ${max} seats`;
-    el.classList.toggle('text-rose-600', used >= max);
-    el.classList.toggle('text-slate-500', used < max);
 }
 
 function syncWorkspacePlanLimits(company) {
@@ -212,7 +184,6 @@ function syncWorkspacePlanLimits(company) {
         },
         expiresAt: company.subscriptionExpiresAt || null
     };
-    updateUserSeatUsageBadge();
 }
 
 function populateAssigneeSelects() {
@@ -339,19 +310,8 @@ function stampSharedUpdate(extra = {}) {
     return stampOwnedUpdate(extra);
 }
 
-async function appendAuditEntry(entity, entityId, action, changes) {
-    if (!auth.currentUser) return;
-    try {
-        await addDoc(collection(db, 'audit_logs'), withCompanyId({
-            entity,
-            entityId: entityId || null,
-            action,
-            byUid: auth.currentUser.uid,
-            byEmail: auth.currentUser.email || '',
-            at: serverTimestamp(),
-            changes: changes || null
-        }));
-    } catch (e) { console.error('Audit failed', e); }
+async function appendAuditEntry() {
+    /* Activity logging disabled */
 }
 
 /** kind: 'candidate' | 'interview' | 'offer' */
@@ -440,48 +400,10 @@ function subscribePresencePeers() {
 }
 
 function subscribeAuditFeed() {
-    const dashFeed = document.getElementById('dashboard-activity-feed');
-    if (!auth.currentUser || !currentUserProfile?.companyId) return;
     if (auditUnsub) {
         try { auditUnsub(); } catch (e) { /* noop */ }
         auditUnsub = null;
     }
-    try {
-        const cid = currentUserProfile.companyId;
-        const q = query(collection(db, 'audit_logs'), where('companyId', '==', cid), limit(80));
-        auditUnsub = onSnapshot(q, (snap) => {
-            const logs = sortByDateDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })), 'at');
-            window.cachedAuditLogs = logs;
-
-            // Update Dashboard Feed if present
-            if (dashFeed) {
-                dashFeed.innerHTML = logs.slice(0, 15).map(x => {
-                    const t = x.at?.toDate ? timeAgo(x.at.toDate()) : 'just now';
-                    const icon = getActionIcon(x.action);
-                    return `
-                        <div class="flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 transition-all hover:border-blue-500/30">
-                            <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 flex-shrink-0">
-                                <i class="${icon} text-xs"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-[11px] font-bold text-slate-900 dark:text-white leading-tight">${escapeHtml(x.action)} <span class="text-slate-400 font-medium">on</span> ${escapeHtml(x.entity)}</p>
-                                <p class="text-[9px] text-slate-500 mt-1 font-medium">${escapeHtml((x.byEmail || 'system').split('@')[0])} • ${t}</p>
-                            </div>
-                        </div>
-                    `;
-                }).join('') || '<div class="text-center py-8 text-slate-400">No recent activity</div>';
-            }
-        });
-    } catch (e) { console.warn('audit sub failed', e); }
-}
-
-function getActionIcon(action) {
-    action = (action || '').toLowerCase();
-    if (action.includes('create') || action.includes('add')) return 'fas fa-plus-circle';
-    if (action.includes('update') || action.includes('edit')) return 'fas fa-pen-to-square';
-    if (action.includes('delete') || action.includes('remove')) return 'fas fa-trash-alt';
-    if (action.includes('approve')) return 'fas fa-check-circle';
-    return 'fas fa-bolt';
 }
 
 function timeAgo(date) {
@@ -499,10 +421,7 @@ function timeAgo(date) {
     return Math.floor(seconds) + "s";
 }
 
-window.toggleMyPipelineOnly = (el) => {
-    myPipelineOnly = !!(el && el.checked);
-    queueRender();
-};
+// My-pipeline toggle removed
 
 window.setAssigneesFromDoc = (prefix, docSnap) => {
     const sel = document.getElementById(`${prefix}-assignees`);
@@ -587,26 +506,9 @@ window.assignRecordToMe = async (collectionName, id) => {
     }
 };
 
-window.filterAuditForEntity = async (entity, entityId) => {
+window.filterAuditForEntity = async () => {
     const box = document.getElementById('record-audit-body');
-    if (!box) return;
-    box.innerHTML = '<p class="text-xs text-slate-400">Loading…</p>';
-    try {
-        const qy = query(
-            collection(db, 'audit_logs'),
-            where('companyId', '==', currentUserProfile?.companyId || null),
-            where('entity', '==', entity),
-            where('entityId', '==', entityId),
-            limit(40)
-        );
-        const snap = await getDocs(qy);
-        box.innerHTML = sortByDateDesc(snap.docs.map((d) => ({ id: d.id, ...d.data() })), 'at').map((x) => {
-            const t = x.at?.toDate ? x.at.toDate().toLocaleString() : '';
-            return `<div class="text-[11px] border-b border-slate-100 dark:border-slate-800 py-2"><span class="text-slate-500">${escapeHtml(t)}</span> — <strong>${escapeHtml(x.action || '')}</strong> by ${escapeHtml(x.byEmail || '')}</div>`;
-        }).join('') || '<p class="text-xs">No history.</p>';
-    } catch (e) {
-        box.innerHTML = '<p class="text-xs text-red-500">Could not load history (index may be building).</p>';
-    }
+    if (box) box.innerHTML = '';
 };
 
 
@@ -624,680 +526,6 @@ window.filterOffersByStatus = (status) => {
     renderOffers();
 };
 
-window.loadOfferTemplates = async () => {
-    const list = [];
-    try {
-        const q = query(
-            collection(db, 'offerTemplates'),
-            where('companyId', '==', currentUserProfile?.companyId || null),
-            limit(200)
-        );
-        const snapshot = await getDocs(q);
-        snapshot.forEach(docSnap => {
-            list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-    } catch (e) {
-        console.error('Cannot load offer templates', e);
-        showToast('Template load failed');
-    }
-    cachedOfferTemplates = sortByDateDesc(list);
-    renderOfferTemplates();
-    populateOfferTemplateSelector();
-};
-
-window.populateOfferTemplateSelector = () => {
-    const selector = document.getElementById('offer-template-selector');
-    if (!selector) return;
-
-    selector.innerHTML = '<option value="">Select Template</option>';
-    cachedOfferTemplates.forEach(template => {
-        const option = document.createElement('option');
-        option.value = template.id;
-        option.textContent = template.name || 'Untitled Template';
-        if (template.id === selectedOfferTemplateId) {
-            option.selected = true;
-        }
-        selector.appendChild(option);
-    });
-};
-
-window.renderOfferTemplates = () => {
-    const tbody = document.querySelector('#offer-template-list tbody');
-    if (!tbody) return;
-    if (!cachedOfferTemplates || cachedOfferTemplates.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-slate-400 py-4">No templates added yet. Paste a GitHub/raw PDF URL to begin.</td></tr>';
-        updateSelectedOfferTemplateSummary(null);
-        selectedOfferTemplateId = null;
-        return;
-    }
-
-    tbody.innerHTML = cachedOfferTemplates.map(template => {
-        const isActive = selectedOfferTemplateId === template.id;
-        const fieldsCount = template.fields ? template.fields.length : 0;
-        const sourceLabel = getOfferTemplateSourceLabel(template);
-        return `
-            <tr class="${isActive ? 'bg-blue-100 dark:bg-blue-900/40' : ''}">
-                <td class="px-2 py-2 text-[11px]">${escapeHtml(template.name || template.label || 'Untitled')}</td>
-                <td class="px-2 py-2 text-[11px]"><span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">${sourceLabel}</span></td>
-                <td class="px-2 py-2 text-[11px]">${template.type || (fieldsCount ? 'AcroForm' : 'Static')}</td>
-                <td class="px-2 py-2 text-[11px]">${fieldsCount}</td>
-                <td class="px-2 py-2 text-[11px] flex gap-1 flex-wrap">
-                    <button class="px-2 py-1 bg-blue-600 text-white rounded-lg text-[10px]" onclick="selectOfferTemplate('${template.id}')">Select</button>
-                    <button class="px-2 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-100 rounded-lg text-[10px]" onclick="previewOfferTemplate('${template.url}')">Preview</button>
-                    <button class="px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10px]" onclick="openOfferTemplateMapper('${template.id}')">Map</button>
-                    <button class="px-2 py-1 bg-emerald-600 text-white rounded-lg text-[10px]" onclick="copyOfferTemplateUrl('${template.id}')">Copy URL</button>
-                    <button class="px-2 py-1 bg-red-500 text-white rounded-lg text-[10px]" onclick="deleteOfferTemplate('${template.id}')">Delete</button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-
-    const sel = cachedOfferTemplates.find(t => t.id === selectedOfferTemplateId);
-    updateSelectedOfferTemplateSummary(sel);
-};
-
-window.selectOfferTemplate = (id) => {
-    selectedOfferTemplateId = id;
-    renderOfferTemplates();
-};
-
-function normalizePdfTemplateUrl(input) {
-    const raw = String(input || '').trim();
-    if (!raw) return '';
-
-    let parsed;
-    try {
-        parsed = new URL(raw);
-    } catch (e) {
-        throw new Error('Enter a valid PDF URL.');
-    }
-
-    if (parsed.hostname === 'github.com') {
-        const parts = parsed.pathname.split('/').filter(Boolean);
-        if (parts.length >= 5 && (parts[2] === 'blob' || parts[2] === 'raw')) {
-            return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${parts.slice(3).join('/')}`;
-        }
-    }
-
-    if (parsed.hostname === 'raw.githubusercontent.com' || parsed.hostname.endsWith('.github.io')) {
-        return parsed.href;
-    }
-
-    return parsed.href;
-}
-
-function getOfferTemplateSourceLabel(template) {
-    const source = template?.sourceType || '';
-    const url = template?.url || '';
-    if (source === 'github' || url.includes('raw.githubusercontent.com') || url.includes('github.com') || url.includes('github.io')) return 'GitHub';
-    if (source === 'cloudinary' || url.includes('cloudinary.com')) return 'Cloudinary';
-    if (source === 'url') return 'URL';
-    return 'Template';
-}
-
-function updateOfferTemplateStatus(message, tone = 'success') {
-    const el = document.getElementById('offer-template-status');
-    if (!el) return;
-    el.textContent = message || '';
-    el.classList.toggle('hidden', !message);
-    el.classList.toggle('text-red-600', tone === 'error');
-    el.classList.toggle('text-emerald-600', tone !== 'error');
-}
-
-function updateSelectedOfferTemplateSummary(template) {
-    const nameEl = document.getElementById('selected-offer-template-name');
-    const sourceEl = document.getElementById('selected-offer-template-source');
-    const pagesEl = document.getElementById('selected-offer-template-pages');
-    if (nameEl) nameEl.innerText = template ? (template.name || 'Untitled') : 'None';
-    if (sourceEl) sourceEl.innerText = template ? getOfferTemplateSourceLabel(template) : 'None';
-    if (pagesEl) pagesEl.innerText = template ? (template.pageCount || '-') : '-';
-}
-
-window.previewOfferTemplate = (url) => {
-    if (!url) return;
-    window.open(url, '_blank');
-};
-
-window.copyOfferTemplateUrl = async (id) => {
-    const template = cachedOfferTemplates.find(t => t.id === id);
-    if (!template?.url) return showToast('Template URL not available.');
-    try {
-        await navigator.clipboard.writeText(template.url);
-        showToast('Template URL copied.');
-    } catch (e) {
-        updateOfferTemplateStatus(template.url);
-        showToast('Copy blocked. URL shown below the template list.');
-    }
-};
-
-window.deleteOfferTemplate = async (id) => {
-    const confirmDelete = confirm('Delete this template permanently?');
-    if (!confirmDelete) return;
-    try {
-        await deleteDoc(doc(db, 'offerTemplates', id));
-        showToast('Template deleted.');
-        if (selectedOfferTemplateId === id) selectedOfferTemplateId = null;
-        loadOfferTemplates();
-    } catch (e) {
-        console.error('Template delete failed', e);
-        showToast('Template delete failed');
-    }
-};
-
-window.handleOfferTemplateUpload = async (event) => {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    if (file.type !== 'application/pdf') {
-        showToast('Only PDF templates are supported for this feature.');
-        return;
-    }
-
-    try {
-        const now = new Date();
-        const publicId = `offer_template_${now.getTime()}`;
-        const url = await uploadResumeToCloudinary(file, publicId);
-
-        const info = await window.pdfService.getTemplateInfo(url);
-        const fields = info.fields || [];
-        const type = fields.length > 0 ? 'AcroForm' : 'Static';
-
-        await addDoc(collection(db, 'offerTemplates'), stampSharedCreate({
-            name: file.name,
-            url,
-            sourceType: 'cloudinary',
-            type,
-            fields,
-            pageCount: info.pageCount || 0,
-            pageSize: info.pageSize || null
-        }));
-
-        showToast(`Template uploaded (${type}).`);
-        loadOfferTemplates();
-        event.target.value = '';
-    } catch (e) {
-        console.error('Template upload error', e);
-        showToast('Template uploads failed.');
-    }
-};
-
-window.addOfferTemplateFromUrl = async () => {
-    const urlInput = document.getElementById('offer-template-url-input');
-    const nameInput = document.getElementById('offer-template-name-input');
-    const originalUrl = urlInput?.value || '';
-
-    let url = '';
-    try {
-        url = normalizePdfTemplateUrl(originalUrl);
-    } catch (e) {
-        updateOfferTemplateStatus(e.message, 'error');
-        showToast(e.message);
-        return;
-    }
-
-    if (!url.toLowerCase().split('?')[0].endsWith('.pdf')) {
-        updateOfferTemplateStatus('Use a direct PDF URL. GitHub blob links are accepted and converted automatically.', 'error');
-        showToast('Please use a PDF URL.');
-        return;
-    }
-
-    try {
-        updateOfferTemplateStatus('Checking PDF URL and reading fields...');
-        const info = await window.pdfService.getTemplateInfo(url);
-        const fields = info.fields || [];
-        const type = fields.length > 0 ? 'AcroForm' : 'Static';
-        const urlName = decodeURIComponent(url.split('/').pop().split('?')[0] || 'PDF Template');
-
-        const docRef = await addDoc(collection(db, 'offerTemplates'), stampSharedCreate({
-            name: (nameInput?.value || '').trim() || urlName,
-            url,
-            originalUrl: originalUrl.trim(),
-            sourceType: url.includes('github') || url.includes('githubusercontent') ? 'github' : 'url',
-            type,
-            fields,
-            pageCount: info.pageCount || 0,
-            pageSize: info.pageSize || null
-        }));
-
-        selectedOfferTemplateId = docRef.id;
-        if (urlInput) urlInput.value = '';
-        if (nameInput) nameInput.value = '';
-        updateOfferTemplateStatus(`Template added from ${url.includes('githubusercontent') ? 'GitHub' : 'URL'} (${type}, ${info.pageCount || 0} page${info.pageCount === 1 ? '' : 's'}).`);
-        showToast('Template added.');
-        await loadOfferTemplates();
-    } catch (e) {
-        console.error('Template URL add failed', e);
-        updateOfferTemplateStatus('Could not read that PDF URL. Make sure the GitHub repo/file is public and the raw file is accessible.', 'error');
-        showToast('Template URL failed.');
-    }
-};
-
-window.buildOfferData = (offer, candidate, job) => {
-    // Format dates
-    const formatDate = (date) => {
-        if (!date) return '';
-        if (date.toDate) date = date.toDate();
-        if (date instanceof Date) {
-            return date.toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-            });
-        }
-        return date;
-    };
-
-    // Format currency
-    const formatCurrency = (amount) => {
-        if (!amount) return '';
-        const num = parseFloat(amount);
-        if (isNaN(num)) return amount;
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            minimumFractionDigits: 0
-        }).format(num);
-    };
-
-    const base = {
-        candidate_name: candidate?.name || '',
-        candidate_email: candidate?.email || '',
-        candidate_phone: candidate?.phone || '',
-        candidate_current_company: candidate?.currentCompany || '',
-        candidate_designation: candidate?.currentDesignation || candidate?.designation || '',
-        candidate_experience: candidate?.experience ? `${candidate.experience} years` : '',
-        candidate_notice_period: candidate?.noticePeriod ? `${candidate.noticePeriod} days` : '',
-        candidate_expected_ctc: formatCurrency(candidate?.expectedCTC),
-        candidate_current_ctc: formatCurrency(candidate?.currentCTC),
-        job_title: job?.title || '',
-        job_department: job?.department || '',
-        job_location: job?.location || '',
-        offer_ctc: formatCurrency(offer?.offeredCTC),
-        offer_monthly: formatCurrency(offer?.monthlyInHand),
-        offer_joining_date: formatDate(offer?.joiningDate),
-        offer_date: formatDate(offer?.offerPreparedAt || new Date()),
-
-        // Additional fields
-        company_name: job?.companyName || 'Our Company',
-        candidate_qualification: candidate?.qualification || '',
-        candidate_skills: candidate?.skills || '',
-        job_description: job?.description || '',
-        offer_probation_period: '3 months',
-        offer_work_hours: '9 AM - 6 PM',
-        offer_reporting_to: job?.reportingTo || 'Manager'
-    };
-    return base;
-};
-
-window.generateOfferDocument = async (offerId) => {
-    if (!offerId) return showToast('Offer ID missing');
-    const offer = cachedOffers.find(o => o.id === offerId);
-    if (!offer) return showToast('Offer not found');
-    const candidate = cachedCandidates.find(c => c.id === offer.candidateId);
-    const job = cachedJobs.find(j => j.id === offer.jobId);
-    if (!candidate) return showToast('Candidate not loaded');
-
-    const templateId = selectedOfferTemplateId || (cachedOfferTemplates[0] && cachedOfferTemplates[0].id);
-    if (!templateId) return showToast('Please select or upload a template first.');
-
-    const template = cachedOfferTemplates.find(t => t.id === templateId);
-    if (!template || !template.url) return showToast('Template not available');
-
-    const fillData = window.buildOfferData(offer, candidate, job);
-
-    try {
-        const options = { coordMap: template.coordinateMap || {} };
-        const pdfBlob = await window.pdfService.fillPdfForm(template.url, fillData, options);
-        window.pdfService.downloadBlob(pdfBlob, `${candidate.name || 'offer'}_${offerId}.pdf`);
-        showToast('Offer letter generated!');
-    } catch (e) {
-        console.error('PDF generation failed', e);
-        showToast('Failed to generate PDF.');
-    }
-};
-
-window.previewOfferDocument = async (offerId) => {
-    if (!offerId) return showToast('Offer ID missing');
-    const offer = cachedOffers.find(o => o.id === offerId);
-    if (!offer) return showToast('Offer not found');
-    const candidate = cachedCandidates.find(c => c.id === offer.candidateId);
-    const job = cachedJobs.find(j => j.id === offer.jobId);
-    if (!candidate) return showToast('Candidate not loaded');
-
-    const templateId = selectedOfferTemplateId || (cachedOfferTemplates[0] && cachedOfferTemplates[0].id);
-    if (!templateId) return showToast('Please select or upload a template first.');
-
-    const template = cachedOfferTemplates.find(t => t.id === templateId);
-    if (!template || !template.url) return showToast('Template not available');
-
-    const fillData = window.buildOfferData(offer, candidate, job);
-
-    try {
-        showToast('Generating preview...');
-        const options = { coordMap: template.coordinateMap || {} };
-        const pdfBlob = await window.pdfService.fillPdfForm(template.url, fillData, options);
-
-        // Create a temporary URL for preview
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-
-        // Open in resume preview modal
-        const iframe = document.getElementById('resume-preview-iframe');
-        const loader = document.getElementById('resume-preview-loader');
-        const modal = document.getElementById('modal-resume-preview');
-
-        if (iframe && loader && modal) {
-            loader.classList.remove('hidden');
-            iframe.src = 'about:blank';
-
-            iframe.onload = () => {
-                loader.classList.add('hidden');
-            };
-
-            iframe.src = pdfUrl;
-            openModal('modal-resume-preview');
-
-            // Update download button to use this PDF
-            const downloadBtn = document.getElementById('resume-download-btn-forced');
-            if (downloadBtn) {
-                downloadBtn.onclick = () => {
-                    window.pdfService.downloadBlob(pdfBlob, `${candidate.name || 'offer'}_${offerId}.pdf`);
-                    showToast('Offer letter downloaded!');
-                };
-            }
-        } else {
-            // Fallback: open in new tab
-            window.open(pdfUrl, '_blank');
-        }
-
-        showToast('Preview generated successfully!');
-    } catch (e) {
-        console.error('PDF preview failed', e);
-        showToast('Failed to generate preview.');
-    }
-};
-
-function getPdfFillerContext() {
-    const templateId = selectedOfferTemplateId;
-    if (!templateId) {
-        showToast('Please select a template first.');
-        return null;
-    }
-
-    const template = cachedOfferTemplates.find(t => t.id === templateId);
-    if (!template) {
-        showToast('Template not available');
-        return null;
-    }
-
-    const candidateId = document.getElementById('pdf-filler-candidate-select').value;
-    if (!candidateId) {
-        showToast('Please select a candidate.');
-        return null;
-    }
-
-    const candidate = cachedCandidates.find(c => c.id === candidateId);
-    if (!candidate) {
-        showToast('Candidate not found.');
-        return null;
-    }
-
-    const job = cachedJobs.find(j => j.id === candidate.jobId) || {};
-    const fillData = window.buildOfferData({}, candidate, job); // empty offer, since no offer data
-    return { template, candidate, fillData };
-}
-
-async function buildPdfFromFillerContext(context) {
-    const options = { coordMap: context.template.coordinateMap || {} };
-    return await window.pdfService.fillPdfForm(context.template.url, context.fillData, options);
-}
-
-function getGeneratedPdfName(candidate, suffix = 'document') {
-    return `${(candidate.name || 'candidate').replace(/[\\/:*?"<>|]+/g, '_')}_${suffix}.pdf`;
-}
-
-window.generatePdfFromCandidate = async () => {
-    const context = getPdfFillerContext();
-    if (!context) return;
-    try {
-        updateOfferTemplateStatus('Generating PDF...');
-        const pdfBlob = await buildPdfFromFillerContext(context);
-        window.pdfService.downloadBlob(pdfBlob, getGeneratedPdfName(context.candidate));
-        updateOfferTemplateStatus('PDF generated and downloaded.');
-        showToast('PDF generated successfully!');
-    } catch (e) {
-        console.error('PDF generation failed', e);
-        updateOfferTemplateStatus(`PDF generation failed: ${e.message || 'check that the template URL is reachable from this network.'}`, 'error');
-        showToast('Failed to generate PDF.');
-    }
-};
-
-window.previewPdfFromCandidate = async () => {
-    const context = getPdfFillerContext();
-    if (!context) return;
-    try {
-        updateOfferTemplateStatus('Generating preview...');
-        const pdfBlob = await buildPdfFromFillerContext(context);
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const iframe = document.getElementById('resume-preview-iframe');
-        const loader = document.getElementById('resume-preview-loader');
-        const modal = document.getElementById('modal-resume-preview');
-
-        if (iframe && loader && modal) {
-            loader.classList.remove('hidden');
-            iframe.src = 'about:blank';
-            iframe.onload = () => loader.classList.add('hidden');
-            iframe.src = pdfUrl;
-            openModal('modal-resume-preview');
-
-            const downloadBtn = document.getElementById('resume-download-btn-forced');
-            if (downloadBtn) {
-                downloadBtn.onclick = () => {
-                    window.pdfService.downloadBlob(pdfBlob, getGeneratedPdfName(context.candidate));
-                    showToast('PDF downloaded.');
-                };
-            }
-        } else {
-            window.open(pdfUrl, '_blank');
-        }
-        updateOfferTemplateStatus('Preview ready.');
-        showToast('Preview generated.');
-    } catch (e) {
-        console.error('PDF preview failed', e);
-        updateOfferTemplateStatus(`Preview failed: ${e.message || 'check that the template URL is reachable from this network.'}`, 'error');
-        showToast('Failed to generate preview.');
-    }
-};
-
-window.openOfferTemplateMapper = async (templateId) => {
-    const template = cachedOfferTemplates.find(t => t.id === templateId);
-    if (!template) return showToast('Template not found for mapping.');
-
-    currentOfferTemplateMapperId = templateId;
-    currentOfferTemplateMapperEntries = template.coordinateMap || {};
-
-    const fields = [
-        'candidate_name', 'candidate_email', 'candidate_phone', 'candidate_current_company',
-        'candidate_designation', 'candidate_experience', 'candidate_notice_period',
-        'candidate_expected_ctc', 'candidate_current_ctc', 'candidate_qualification',
-        'candidate_skills', 'job_title', 'job_department', 'job_location', 'job_description',
-        'company_name', 'offer_ctc', 'offer_monthly', 'offer_joining_date', 'offer_date',
-        'offer_probation_period', 'offer_work_hours', 'offer_reporting_to'
-    ];
-
-    document.getElementById('offer-mapper-template-name').innerText = template.name || 'Untitled';
-    const fieldSelect = document.getElementById('offer-mapper-field-select');
-    fieldSelect.innerHTML = `<option value="">-- Select field --</option>${fields.map(k => `<option value="${k}">${k}</option>`).join('')}`;
-
-    renderOfferTemplateMapperEntries();
-
-    // Show dialog before measuring layout
-    const mapperDialog = document.getElementById('offer-mapper-dialog');
-    if (mapperDialog && mapperDialog.classList.contains('hidden')) {
-        mapperDialog.classList.remove('hidden');
-    }
-    await new Promise(resolve => requestAnimationFrame(resolve));
-
-    // Load PDF with PDF.js
-    const canvas = document.getElementById('offer-mapper-canvas');
-    let page;
-    try {
-        const loadingTask = pdfjsLib.getDocument(template.url);
-        const pdf = await loadingTask.promise;
-        page = await pdf.getPage(1);
-    } catch (e) {
-        console.error('Template mapper failed to load PDF', e);
-        updateOfferMapperStatus('Could not render this PDF. Confirm the GitHub/raw URL is public and reachable.');
-        showToast('Could not render template for mapping.');
-        return;
-    }
-    const originalViewport = page.getViewport({ scale: 1.0 });
-    currentMapperPageDim = { width: originalViewport.width, height: originalViewport.height };
-
-    // Scale to fit container, preserve aspect ratio
-    const container = document.getElementById('offer-mapper-click-layer');
-    const rect = container.getBoundingClientRect();
-    const cssScale = Math.min(rect.width / originalViewport.width, rect.height / originalViewport.height);
-    const displayWidth = originalViewport.width * cssScale;
-    const displayHeight = originalViewport.height * cssScale;
-
-    // High DPI support
-    const outputScale = window.devicePixelRatio || 1;
-    const renderScale = cssScale * outputScale;
-
-    const renderViewport = page.getViewport({ scale: renderScale });
-    canvas.width = Math.round(renderViewport.width);
-    canvas.height = Math.round(renderViewport.height);
-    canvas.style.width = `${Math.round(displayWidth)}px`;
-    canvas.style.height = `${Math.round(displayHeight)}px`;
-
-    const context = canvas.getContext('2d');
-    context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
-
-    await page.render({ canvasContext: context, viewport: renderViewport }).promise;
-
-    currentMapperScale = cssScale;
-    currentMapperDisplayDim = { width: displayWidth, height: displayHeight };
-
-    renderOfferMapperMarkers();
-    document.getElementById('offer-mapper-dialog').classList.remove('hidden');
-};
-
-window.closeOfferTemplateMapper = () => {
-    document.getElementById('offer-mapper-dialog').classList.add('hidden');
-    currentOfferTemplateMapperId = null;
-    currentMapperSelectedField = '';
-};
-
-window.onOfferMapperFieldChoose = (sel) => {
-    currentMapperSelectedField = sel;
-    showToast(`Click on the PDF preview to place field: ${sel}`);
-};
-
-window.updateOfferMapperStatus = (message) => {
-    const el = document.getElementById('offer-mapper-status');
-    if (el) el.textContent = message;
-};
-
-window.renderOfferTemplateMapperEntries = () => {
-    const mapperTable = document.getElementById('offer-mapper-table-body');
-    if (!mapperTable) return;
-    mapperTable.innerHTML = '';
-
-    for (const [key, coords] of Object.entries(currentOfferTemplateMapperEntries)) {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="px-2 py-2 text-[11px]">${escapeHtml(key)}</td>
-            <td class="px-2 py-2 text-[11px]"><input type="number" step="0.1" value="${coords.x.toFixed(1)}" class="theme-input text-[10px] w-full" onchange="updateOfferMapperCoordinate('${key}', 'x', this.value)"></td>
-            <td class="px-2 py-2 text-[11px]"><input type="number" step="0.1" value="${coords.y.toFixed(1)}" class="theme-input text-[10px] w-full" onchange="updateOfferMapperCoordinate('${key}', 'y', this.value)"></td>
-            <td class="px-2 py-2 text-[11px]"><input type="number" step="0.5" value="${coords.size || 11}" class="theme-input text-[10px] w-full" onchange="updateOfferMapperCoordinate('${key}', 'size', this.value)"></td>
-            <td class="px-2 py-2 text-[11px]"><button class="px-2 py-0.5 bg-red-500 text-white rounded" onclick="removeOfferMapperField('${key}')">Remove</button></td>
-        `;
-        mapperTable.appendChild(row);
-    }
-};
-
-window.renderOfferMapperMarkers = () => {
-    const markersLayer = document.getElementById('offer-mapper-markers-layer');
-    if (!markersLayer) return;
-
-    markersLayer.innerHTML = '';
-    if (!currentMapperPageDim.width || !currentMapperPageDim.height) return;
-
-    const canvas = document.getElementById('offer-mapper-canvas');
-    if (!canvas) return;
-
-    const displayWidth = currentMapperDisplayDim.width || canvas.clientWidth;
-    const displayHeight = currentMapperDisplayDim.height || canvas.clientHeight;
-
-    for (const [fieldKey, coords] of Object.entries(currentOfferTemplateMapperEntries)) {
-        if (coords.x == null || coords.y == null) continue;
-        const sx = (coords.x / currentMapperPageDim.width) * displayWidth;
-        const sy = displayHeight - (coords.y / currentMapperPageDim.height) * displayHeight; // display coordinates in top-left
-
-        const dot = document.createElement('span');
-        dot.className = 'absolute w-2.5 h-2.5 rounded-full border border-white bg-rose-500 shadow-lg';
-        dot.title = `${fieldKey} (${coords.x.toFixed(1)}, ${coords.y.toFixed(1)})`;
-        dot.style.left = `${Math.min(Math.max(sx - 4, 0), displayWidth - 8)}px`;
-        dot.style.top = `${Math.min(Math.max(sy - 4, 0), displayHeight - 8)}px`;
-        markersLayer.appendChild(dot);
-    }
-};
-
-window.onOfferMapperClick = async (event) => {
-    if (!currentMapperSelectedField) {
-        showToast('First select a field name to map.');
-        return;
-    }
-
-    const canvas = document.getElementById('offer-mapper-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
-
-    if (!currentMapperPageDim.width || !currentMapperPageDim.height || !currentMapperDisplayDim.width || !currentMapperDisplayDim.height) {
-        showToast('Unable to map; preview is not ready.');
-        return;
-    }
-
-    // Convert to PDF coordinates from displayed canvas coordinates
-    const mappedX = (clickX / rect.width) * currentMapperPageDim.width;
-    const mappedY = currentMapperPageDim.height - ((clickY / rect.height) * currentMapperPageDim.height); // PDF origin bottom-left
-
-    currentOfferTemplateMapperEntries[currentMapperSelectedField] = { x: mappedX, y: mappedY, size: 11 };
-    updateOfferMapperStatus(`Placed ${currentMapperSelectedField} at ${mappedX.toFixed(1)}, ${mappedY.toFixed(1)}`);
-    renderOfferTemplateMapperEntries();
-    renderOfferMapperMarkers();
-};
-
-window.saveOfferTemplateMapping = async () => {
-    if (!currentOfferTemplateMapperId) return showToast('No template loaded.');
-    try {
-        await updateDoc(doc(db, 'offerTemplates', currentOfferTemplateMapperId), {
-            coordinateMap: currentOfferTemplateMapperEntries,
-            updatedAt: serverTimestamp()
-        });
-        showToast('Template mapping saved');
-        loadOfferTemplates();
-        closeOfferTemplateMapper();
-    } catch (e) {
-        console.error('Error saving template mapping', e);
-        showToast('Could not save mapping.');
-    }
-};
-
-window.removeOfferMapperField = (fieldKey) => {
-    delete currentOfferTemplateMapperEntries[fieldKey];
-    renderOfferTemplateMapperEntries();
-    renderOfferMapperMarkers();
-};
-
-window.updateOfferMapperCoordinate = (fieldKey, axis, value) => {
-    if (!currentOfferTemplateMapperEntries[fieldKey]) return;
-    const parsed = parseFloat(value);
-    if (Number.isNaN(parsed)) return;
-    currentOfferTemplateMapperEntries[fieldKey][axis] = parsed;
-    updateOfferMapperStatus(`Updated ${fieldKey} ${axis} to ${parsed.toFixed(1)}`);
-    renderOfferMapperMarkers();
-};
 
 let cachedWaTemplates = []; // added back
 
@@ -1305,6 +533,17 @@ let cachedTalentPool = [];
 let whatsappSelectedCandidates = new Set();
 let globalSearchQuery = '';
 let currentArchiveTab = 'candidates'; // 'candidates' or 'jobs'
+let archiveSort = 'hired-desc';
+
+function populateArchiveDeptFilter() {
+    const sel = document.getElementById('archive-dept-filter');
+    if (!sel) return;
+    const depts = [...new Set(cachedJobs.map(j => j.department).filter(Boolean))].sort();
+    const cur = sel.value || 'all';
+    sel.innerHTML = '<option value="all">All departments</option>' +
+        depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+    sel.value = depts.includes(cur) || cur === 'all' ? cur : 'all';
+}
 
 window.switchArchiveTab = (tab) => {
     currentArchiveTab = tab;
@@ -1321,6 +560,11 @@ window.switchArchiveTab = (tab) => {
 };
 
 window.filterArchive = () => {
+    renderArchive();
+};
+
+window.setArchiveSort = (value) => {
+    archiveSort = value || 'hired-desc';
     renderArchive();
 };
 // Track initial Firestore loads so loader stays visible until data is ready
@@ -1904,9 +1148,7 @@ onAuthStateChanged(auth, async (user) => {
         await loadUserDirectoryForAssignments();
         startPresenceHeartbeat();
         subscribePresencePeers();
-        if (perm.canViewAudit(profile.role)) {
-            subscribeAuditFeed();
-        }
+        // activity/audit feed disabled per configuration
 
         startIdleTimer();
         initApp();
@@ -2852,16 +2094,67 @@ function renderArchive() {
     const statsContainer = document.getElementById('archive-stats');
     if (!container) return;
 
-    // Get search term
+    populateArchiveDeptFilter();
     const searchTerm = (document.getElementById('archive-search')?.value || '').toLowerCase().trim();
-
+    const countEl = document.getElementById('archive-result-count');
     if (currentArchiveTab === 'candidates') {
-        renderArchivedCandidates(container, searchTerm);
+        const list = getFilteredArchivedPlacements(searchTerm);
+        if (countEl) countEl.textContent = `${list.length} placement${list.length === 1 ? '' : 's'}`;
+        renderArchivedCandidates(container, list);
         renderArchiveStats(statsContainer, 'candidates');
     } else {
-        renderArchivedJobs(container, searchTerm);
+        const list = getFilteredArchivedJobs(searchTerm);
+        if (countEl) countEl.textContent = `${list.length} closed job${list.length === 1 ? '' : 's'}`;
+        renderArchivedJobs(container, list);
         renderArchiveStats(statsContainer, 'jobs');
     }
+}
+
+function getFilteredArchivedPlacements(searchTerm = '') {
+    const dept = document.getElementById('archive-dept-filter')?.value || 'all';
+    let list = cachedCandidates.filter(c => c.stage === 'Hired');
+    if (searchTerm) {
+        list = list.filter(c => {
+            const job = cachedJobs.find(j => j.id === c.jobId);
+            return (c.name || '').toLowerCase().includes(searchTerm) ||
+                (c.email || '').toLowerCase().includes(searchTerm) ||
+                (job?.title || '').toLowerCase().includes(searchTerm) ||
+                (job?.department || '').toLowerCase().includes(searchTerm);
+        });
+    }
+    if (dept !== 'all') {
+        list = list.filter(c => {
+            const job = cachedJobs.find(j => j.id === c.jobId);
+            return (job?.department || '') === dept;
+        });
+    }
+    list.sort((a, b) => {
+        if (archiveSort === 'name-asc') return (a.name || '').localeCompare(b.name || '');
+        if (archiveSort === 'ctc-desc') return Number(b.offeredCTC || 0) - Number(a.offeredCTC || 0);
+        const ta = getMillis(a.hiredAt || a.updatedAt);
+        const tb = getMillis(b.hiredAt || b.updatedAt);
+        return archiveSort === 'hired-asc' ? ta - tb : tb - ta;
+    });
+    return list;
+}
+
+function getFilteredArchivedJobs(searchTerm = '') {
+    let list = cachedJobs.filter(j => j.status === 'Closed');
+    if (searchTerm) {
+        list = list.filter(j => {
+            const company = cachedCompanies.find(c => c.id === j.companyId);
+            return (j.title || '').toLowerCase().includes(searchTerm) ||
+                (j.department || '').toLowerCase().includes(searchTerm) ||
+                (companyDisplayName(company) || '').toLowerCase().includes(searchTerm);
+        });
+    }
+    list.sort((a, b) => {
+        if (archiveSort === 'name-asc') return (a.title || '').localeCompare(b.title || '');
+        const ta = getMillis(a.updatedAt || a.createdAt);
+        const tb = getMillis(b.updatedAt || b.createdAt);
+        return archiveSort === 'hired-asc' ? ta - tb : tb - ta;
+    });
+    return list;
 }
 
 function renderArchiveStats(container, type) {
@@ -2983,19 +2276,7 @@ function renderArchiveStats(container, type) {
     }
 }
 
-function renderArchivedCandidates(container, searchTerm = '') {
-    let list = cachedCandidates.filter(c => c.stage === 'Hired');
-
-    // Apply search filter
-    if (searchTerm) {
-        list = list.filter(c => {
-            const job = cachedJobs.find(j => j.id === c.jobId);
-            return (c.name || '').toLowerCase().includes(searchTerm) ||
-                (c.email || '').toLowerCase().includes(searchTerm) ||
-                (job?.title || '').toLowerCase().includes(searchTerm) ||
-                (job?.department || '').toLowerCase().includes(searchTerm);
-        });
-    }
+function renderArchivedCandidates(container, list = []) {
     if (list.length === 0) {
         container.innerHTML = `
             <div class="col-span-full py-20 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/20 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
@@ -3007,61 +2288,43 @@ function renderArchivedCandidates(container, searchTerm = '') {
         return;
     }
 
-    container.innerHTML = list.map(c => {
+    container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${list.map(c => {
         const job = cachedJobs.find(j => j.id === c.jobId);
         const initials = (c.name || '').split(' ').map(s => s[0]).join('').substring(0, 2).toUpperCase();
         const hiredDate = c.hiredAt ? new Date(c.hiredAt.seconds * 1000).toLocaleDateString() : (c.updatedAt ? new Date(c.updatedAt.seconds * 1000).toLocaleDateString() : 'N/A');
+        const annual = c.offeredCTC ? (Number(c.offeredCTC) * 12).toLocaleString('en-IN') : '—';
+        const phone = (c.phone || '').replace(/[^0-9+]/g, '');
 
         return `
-            <div class="glass-card hover:bg-slate-50 dark:hover:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-white/5 transition-all">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <div class="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 font-black text-xs shadow-inner shrink-0">
-                            ${initials}
-                        </div>
+            <article class="archive-card glass-card p-5 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 hover:shadow-lg transition-all">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-emerald-500 text-white font-black flex items-center justify-center shadow-md shrink-0">${initials}</div>
                         <div class="min-w-0">
-                            <h3 class="font-bold text-slate-800 dark:text-white leading-tight truncate text-sm">${c.name}</h3>
-                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight truncate">${job ? job.title : 'Deleted Position'}</p>
+                            <h3 class="font-black text-slate-800 dark:text-white truncate">${escapeHtml(c.name || 'Unknown')}</h3>
+                            <p class="text-xs text-slate-500 truncate">${escapeHtml(job?.title || 'Position removed')}</p>
+                            <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-wide mt-0.5">${escapeHtml(job?.department || 'General')}</p>
                         </div>
                     </div>
-                    
-                    <div class="flex items-center gap-6 shrink-0">
-                        <div class="flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Hired</span>
-                            <span class="text-[10px] font-bold text-slate-600 dark:text-slate-200 mt-0.5">${hiredDate}</span>
-                        </div>
-                        <div class="flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">CTC</span>
-                            <span class="text-[10px] font-bold text-emerald-600 mt-0.5">₹${c.offeredCTC ? parseInt(c.offeredCTC).toLocaleString() : 'TBD'}</span>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <button onclick="showCandidateProfile('${c.id}')" class="px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 transition-all flex items-center gap-1.5">
-                            <i class="fas fa-user-circle"></i>Profile
-                        </button>
-                        <button onclick="updateCandidateStage('${c.id}', 'Interview')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-amber-500 hover:border-amber-400 border border-slate-200 dark:border-slate-700 transition-all" title="Restore back to Pipeline">
-                            <i class="fas fa-rotate-left text-[10px]"></i>
-                        </button>
-                    </div>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg shrink-0">Hired</span>
                 </div>
-            </div>
-        `;
-    }).join('');
+                <dl class="grid grid-cols-2 gap-3 text-xs mb-4">
+                    <div><dt class="text-slate-400 font-bold uppercase text-[9px]">Hired on</dt><dd class="font-semibold text-slate-700 dark:text-slate-200">${hiredDate}</dd></div>
+                    <div><dt class="text-slate-400 font-bold uppercase text-[9px]">Monthly CTC</dt><dd class="font-semibold text-emerald-600">₹${c.offeredCTC ? parseInt(c.offeredCTC, 10).toLocaleString('en-IN') : 'TBD'}</dd></div>
+                    <div><dt class="text-slate-400 font-bold uppercase text-[9px]">Annual</dt><dd class="font-semibold text-slate-700 dark:text-slate-200">₹${annual}</dd></div>
+                    <div><dt class="text-slate-400 font-bold uppercase text-[9px]">Source</dt><dd class="font-semibold text-slate-700 dark:text-slate-200">${escapeHtml(c.source || '—')}</dd></div>
+                </dl>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="showCandidateProfile('${c.id}')" class="flex-1 min-w-[7rem] py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[10px] font-bold"><i class="fas fa-user-circle mr-1"></i>Profile</button>
+                    ${job ? `<button type="button" onclick="viewJobDetails('${job.id}')" class="py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 text-[10px] font-bold"><i class="fas fa-briefcase mr-1"></i>Job</button>` : ''}
+                    ${phone ? `<a href="https://wa.me/${phone}" target="_blank" rel="noopener" class="py-2 px-3 rounded-xl bg-[#25D366]/10 text-[#25D366] text-[10px] font-bold"><i class="fab fa-whatsapp"></i></a>` : ''}
+                    <button type="button" onclick="updateCandidateStage('${c.id}', 'Interview')" class="py-2 px-3 rounded-xl border border-amber-200 text-amber-600 text-[10px] font-bold" title="Return to pipeline"><i class="fas fa-rotate-left"></i></button>
+                </div>
+            </article>`;
+    }).join('')}</div>`;
 }
 
-function renderArchivedJobs(container, searchTerm = '') {
-    let list = cachedJobs.filter(j => j.status === 'Closed');
-
-    // Apply search filter
-    if (searchTerm) {
-        list = list.filter(j => {
-            const company = cachedCompanies.find(c => c.id === j.companyId);
-            return (j.title || '').toLowerCase().includes(searchTerm) ||
-                (j.department || '').toLowerCase().includes(searchTerm) ||
-                (company?.name || '').toLowerCase().includes(searchTerm);
-        });
-    }
+function renderArchivedJobs(container, list = []) {
     if (list.length === 0) {
         container.innerHTML = `
             <div class="col-span-full py-20 flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/20 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
@@ -3073,42 +2336,32 @@ function renderArchivedJobs(container, searchTerm = '') {
         return;
     }
 
-    container.innerHTML = list.map(j => {
+    container.innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">${list.map(j => {
         const candidatesForJob = cachedCandidates.filter(c => c.jobId === j.id);
         const hiredCount = candidatesForJob.filter(c => c.stage === 'Hired').length;
+        const rate = candidatesForJob.length ? Math.round((hiredCount / candidatesForJob.length) * 100) : 0;
+        const company = cachedCompanies.find(c => c.id === j.companyId);
 
         return `
-            <div class="glass-card hover:bg-slate-50 dark:hover:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-white/5 transition-all">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div class="flex-1 min-w-0">
-                        <h3 class="font-bold text-slate-800 dark:text-white leading-tight truncate text-sm">${j.title}</h3>
-                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">${j.department || 'General'}</p>
+            <article class="archive-card glass-card p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all">
+                <div class="flex justify-between items-start gap-2 mb-3">
+                    <div class="min-w-0">
+                        <h3 class="font-black text-slate-800 dark:text-white truncate">${escapeHtml(j.title || 'Untitled')}</h3>
+                        <p class="text-xs text-slate-500">${escapeHtml(j.department || 'General')} · ${escapeHtml(companyDisplayName(company))}</p>
                     </div>
-
-                    <div class="flex items-center gap-6 shrink-0">
-                        <div class="flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Candidates</span>
-                            <span class="text-[10px] font-bold text-slate-700 dark:text-white mt-0.5">${candidatesForJob.length}</span>
-                        </div>
-                        <div class="flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Success</span>
-                            <span class="text-[10px] font-bold text-emerald-500 mt-0.5">${hiredCount}</span>
-                        </div>
-                        <div class="flex flex-col items-center">
-                            <span class="text-[8px] font-black text-slate-400 uppercase tracking-widest">Status</span>
-                            <span class="text-[9px] font-black text-red-500/80 mt-0.5 underline decoration-dotted">CLOSED</span>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-2 shrink-0">
-                        <button onclick="editJob('${j.id}')" class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all flex items-center gap-2 whitespace-nowrap">
-                            <i class="fas fa-edit"></i> REOPEN
-                        </button>
-                    </div>
+                    <span class="text-[10px] font-black uppercase text-rose-600 bg-rose-50 dark:bg-rose-900/30 px-2 py-1 rounded-lg">Closed</span>
                 </div>
-            </div>
-        `;
-    }).join('');
+                <div class="grid grid-cols-3 gap-2 text-center text-xs mb-4">
+                    <div class="rounded-xl bg-slate-50 dark:bg-slate-800/50 py-2"><div class="text-slate-400 text-[9px] font-bold uppercase">Applicants</div><div class="font-black text-slate-800 dark:text-white">${candidatesForJob.length}</div></div>
+                    <div class="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 py-2"><div class="text-emerald-600 text-[9px] font-bold uppercase">Hired</div><div class="font-black text-emerald-600">${hiredCount}</div></div>
+                    <div class="rounded-xl bg-blue-50 dark:bg-blue-900/20 py-2"><div class="text-blue-600 text-[9px] font-bold uppercase">Rate</div><div class="font-black text-blue-600">${rate}%</div></div>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="viewJobDetails('${j.id}')" class="flex-1 py-2 rounded-xl bg-blue-600 text-white text-[10px] font-bold"><i class="fas fa-eye mr-1"></i>View</button>
+                    <button type="button" onclick="toggleJobStatus('${j.id}', 'Closed')" class="py-2 px-4 rounded-xl border border-slate-200 dark:border-slate-600 text-[10px] font-bold text-slate-600 dark:text-slate-300"><i class="fas fa-door-open mr-1"></i>Reopen</button>
+                </div>
+            </article>`;
+    }).join('')}</div>`;
 }
 
 function exportArchiveCSV() {
@@ -3117,11 +2370,11 @@ function exportArchiveCSV() {
     let headers = [];
 
     if (currentArchiveTab === 'candidates') {
-        list = cachedCandidates.filter(c => c.stage === 'Hired');
+        list = getFilteredArchivedPlacements();
         filename = 'placement_archive';
         headers = ['Name', 'Email', 'Phone', 'Position', 'Department', 'Company', 'Hired Date', 'Monthly CTC', 'Annual CTC', 'Source', 'Experience'];
     } else {
-        list = cachedJobs.filter(j => j.status === 'Closed');
+        list = getFilteredArchivedJobs();
         filename = 'closed_jobs_archive';
         headers = ['Job Title', 'Department', 'Company', 'Budget (LPA)', 'Posted Date', 'Closed Date', 'Total Candidates', 'Placements', 'Success Rate'];
     }
@@ -3360,8 +2613,8 @@ function renderInterviews() {
 // --- DASHBOARD ANALYTICS ---
 let stageChartInstance, budgetChartInstance, sourceChartInstance;
 function updateDashboard() {
-    const dashCandidates = applyMyPipelineIfNeeded(cachedCandidates);
-    const dashInterviews = applyMyPipelineIfNeeded(cachedInterviews);
+    const dashCandidates = cachedCandidates;
+    const dashInterviews = cachedInterviews;
 
     // Filter for Active Pipeline (Applied, Screening, Interview, Selected, Offer)
     // Hired and Rejected candidates are excluded from active charts/metrics
@@ -5772,7 +5025,7 @@ window.deleteDocById = async (col, id) => {
     if (confirm("Are you sure you want to permanently delete this?")) {
         try {
             const tenantCols = new Set([
-                'jobs', 'candidates', 'interviews', 'offers', 'offerTemplates',
+                'jobs', 'candidates', 'interviews', 'offers',
                 'whatsappTemplates', 'masters_departments', 'masters_designations',
                 'masters_industries', 'masters_sources'
             ]);
@@ -5784,8 +5037,7 @@ window.deleteDocById = async (col, id) => {
                         col === 'candidates' ? cachedCandidates :
                             col === 'interviews' ? cachedInterviews :
                                 col === 'offers' ? cachedOffers :
-                                    col === 'offerTemplates' ? cachedOfferTemplates :
-                                        col === 'whatsappTemplates' ? cachedWaTemplates :
+                                    col === 'whatsappTemplates' ? cachedWaTemplates :
                                             col === 'masters_departments' ? cachedDepartments :
                                                 col === 'masters_designations' ? cachedDesignations :
                                                     col === 'masters_industries' ? cachedIndustries :
@@ -6329,18 +5581,6 @@ window.hideLoader = () => {
     }
 };
 
-window.populatePdfFillerCandidates = () => {
-    const select = document.getElementById('pdf-filler-candidate-select');
-    if (!select) return;
-    select.innerHTML = '<option value="">-- Choose Candidate --</option>';
-    cachedCandidates.forEach(candidate => {
-        const option = document.createElement('option');
-        option.value = candidate.id;
-        option.textContent = `${candidate.name} - ${candidate.email}`;
-        select.appendChild(option);
-    });
-};
-
 window.showSection = async (sectionId) => {
     // For normal navigation, only show the quick loader if initial data is already loaded.
     if (pendingInitialLoads === 0) {
@@ -6410,11 +5650,6 @@ window.showSection = async (sectionId) => {
                 subtitle: 'Track and manage the final lifecycle of selection',
                 actions: []
             },
-            'pdffiller': {
-                title: 'PDF Filler',
-                subtitle: 'Upload templates and fill PDFs with custom data',
-                actions: []
-            },
             'messaging': {
                 title: 'Communications',
                 subtitle: 'Automate candidate messaging and templates',
@@ -6457,21 +5692,6 @@ window.showSection = async (sectionId) => {
                 subtitle: 'Configure how candidates see your career page',
                 actions: []
             },
-            'usermgmt': {
-                title: 'User management',
-                subtitle: 'Create and manage team access',
-                actions: []
-            },
-            'activity': {
-                title: 'Activity log',
-                subtitle: 'Audit trail of important changes',
-                actions: []
-            },
-            'migration': {
-                title: 'Data migration',
-                subtitle: 'Backfill ownership on legacy records',
-                actions: []
-            }
         };
 
 
@@ -6514,11 +5734,6 @@ window.showSection = async (sectionId) => {
                 break;
             case 'offers':
                 renderOffers();
-                loadOfferTemplates();
-                break;
-            case 'pdffiller':
-                loadOfferTemplates();
-                populatePdfFillerCandidates();
                 break;
             case 'messaging':
                 renderWaCandidatesChecklist();
@@ -6532,9 +5747,6 @@ window.showSection = async (sectionId) => {
                 break;
             case 'contacts':
                 renderContactsSection();
-                break;
-            case 'usermgmt':
-                renderUserManagementTable();
                 break;
             case 'masters':
                 refreshMastersData();
@@ -6861,36 +6073,16 @@ document.getElementById('filter-budget').onchange = renderCandidates;
 
 // Theme Toggle Logic
 window.toggleTheme = (event) => {
-    if (event && typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-
-    const current = localStorage.getItem('theme') || 'system';
-    let next;
-    if (current === 'system') next = 'light';
-    else if (current === 'light') next = 'dark';
-    else next = 'system';
-
-    localStorage.setItem('theme', next);
-
-    const applyTheme = (theme) => {
-        let actual = theme;
-        if (theme === 'system') {
-            actual = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        if (actual === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    };
-
-    applyTheme(next);
-
-    const statusEl = document.getElementById('theme-status');
-    if (statusEl) {
-        statusEl.innerText = next === 'system' ? 'Auto' : next === 'dark' ? 'Dark' : 'Light';
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
     }
 
-    // Update charts if they exist
+    const current = localStorage.getItem('theme') || 'system';
+    const next = current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system';
+    localStorage.setItem('theme', next);
+    syncThemeUi();
+
     if (typeof stageChartInstance !== 'undefined' && stageChartInstance) updateChartTheme(stageChartInstance);
     if (typeof budgetChartInstance !== 'undefined' && budgetChartInstance) updateChartTheme(budgetChartInstance);
     if (typeof sourceChartInstance !== 'undefined' && sourceChartInstance) updateChartTheme(sourceChartInstance);
@@ -6899,11 +6091,6 @@ window.toggleTheme = (event) => {
 window.logoutNow = async () => {
     await signOut(auth);
 };
-
-const themeToggle = document.getElementById('theme-toggle');
-if (themeToggle) {
-    themeToggle.addEventListener('click', window.toggleTheme);
-}
 
 function updateChartTheme(chart) {
     // Optional: deep chart theme update if needed
@@ -7119,60 +6306,28 @@ window.sendOfferEmail = async (id) => {
     const cand = cachedCandidates.find(c => c.id === o?.candidateId);
     if (!cand || !cand.email) return showToast("No email registered", "error");
 
-    // Generate the PDF first
-    try {
-        showToast("Preparing offer letter...");
-        const offer = cachedOffers.find(offer => offer.id === id);
-        const candidate = cand;
-        const job = cachedJobs.find(j => j.id === offer.jobId);
+    const job = cachedJobs.find(j => j.id === o?.jobId);
+    const company = job ? cachedCompanies.find(c => c.id === job.companyId) : null;
+    const companyName = company ? companyDisplayName(company) : (job?.company || 'Our Company');
+    const monthly = o.offeredCTC ? Number(o.offeredCTC).toLocaleString('en-IN') : 'TBD';
+    const subject = `Offer — ${o.jobTitle || 'Position'} | ${companyName}`;
+    const body = `Dear ${cand.name},
 
-        const templateId = selectedOfferTemplateId || (cachedOfferTemplates[0] && cachedOfferTemplates[0].id);
-        if (!templateId) {
-            showToast('Please select or upload a template first.', "error");
-            return;
-        }
+We are pleased to extend an offer for the position of ${o.jobTitle || 'the role'} at ${companyName}.
 
-        const template = cachedOfferTemplates.find(t => t.id === templateId);
-        if (!template || !template.url) {
-            showToast('Template not available', "error");
-            return;
-        }
+Key details:
+- Monthly CTC: ₹${monthly}
+- Joining date: ${o.joiningDate || 'To be confirmed'}
 
-        const fillData = window.buildOfferData(offer, candidate, job);
-        const options = { coordMap: template.coordinateMap || {} };
-        const pdfBlob = await window.pdfService.fillPdfForm(template.url, fillData, options);
+Please reply to confirm your acceptance or reach out if you have questions.
 
-        // Create download link for the PDF
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const pdfFileName = `${candidate.name || 'offer'}_${id}.pdf`;
-
-        const subject = `Offer Letter - ${offer.jobTitle || 'Position'} | ${job?.companyName || 'Our Company'}`;
-        const body = `Dear ${candidate.name},
-
-We are pleased to extend an offer for the position of ${offer.jobTitle || 'the role'} at ${job?.companyName || 'our company'}.
-
-Please find your offer letter attached to this email. The key details of your offer are:
-- Annual CTC: ₹${offer.offeredCTC || 'TBD'}
-- Monthly In-hand: ₹${offer.monthlyInHand || 'TBD'}
-- Joining Date: ${offer.joiningDate || 'TBD'}
-
-Please review the attached offer letter and let us know your acceptance by replying to this email or contacting your recruiter.
-
-To download your offer letter: ${pdfUrl}
-
-Best Regards,
+Best regards,
 Recruitment Team
-${job?.companyName || 'Our Company'}`;
+${companyName}`;
 
-        const mailtoUrl = `mailto:${candidate.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(mailtoUrl, '_blank');
-
-        showToast("Email client opened with offer letter details");
-
-    } catch (e) {
-        console.error('Email preparation failed', e);
-        showToast('Failed to prepare offer letter for email', "error");
-    }
+    const mailtoUrl = `mailto:${cand.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoUrl, '_blank');
+    showToast("Email client opened");
 };
 
 window.updateOfferStatus = async (id, status) => {
@@ -10027,6 +9182,18 @@ window.deleteSource = async (id) => {
 
 // Initialize masters when section is shown
 document.addEventListener('DOMContentLoaded', () => {
+    syncThemeUi();
+    const themeToggle = document.getElementById('theme-toggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', (e) => window.toggleTheme(e));
+        themeToggle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                window.toggleTheme(e);
+            }
+        });
+    }
+
     // Listen for masters section being shown
     const mastersSection = document.getElementById('section-masters');
     if (mastersSection) {
@@ -10160,286 +9327,7 @@ window.populateCandidateMastersData = function () {
     }
 };
 
-// --- ADMIN: USERS & MIGRATION ---
-window.openCreateUserModal = () => {
-    const email = document.getElementById('create-user-email');
-    const name = document.getElementById('create-user-name');
-    const role = document.getElementById('create-user-role');
-    const pass = document.getElementById('create-user-temp-pass');
 
-    if (email) email.value = '';
-    if (name) name.value = '';
-    if (role) role.value = perm.ROLES.RECRUITER;
-    if (pass) pass.value = '';
-
-    const err = document.getElementById('create-user-error');
-    if (err) err.classList.add('hidden');
-    openModal('modal-create-user');
-};
-
-window.submitCreateUser = async () => {
-    if (!perm.canManageUsers(userRole())) return;
-
-    const company = cachedCompanies[0];
-    const userSnap = await getDocs(query(
-        collection(db, 'users'),
-        where('companyId', '==', getActiveCompanyId()),
-        where('status', '==', 'active')
-    ));
-    const seatCheck = canAddWorkspaceUser(company, null, userSnap.size);
-    if (!seatCheck.allowed) {
-        showToast(seatCheck.reason, 'error');
-        return;
-    }
-
-    const email = document.getElementById('create-user-email')?.value?.trim();
-    const displayName = document.getElementById('create-user-name')?.value?.trim();
-    const role = document.getElementById('create-user-role')?.value || perm.ROLES.RECRUITER;
-    const tempPass = document.getElementById('create-user-temp-pass')?.value;
-    const errEl = document.getElementById('create-user-error');
-    if (!email || !tempPass || tempPass.length < 6) {
-        if (errEl) {
-            errEl.textContent = 'Valid email and temporary password (6+ characters) required.';
-            errEl.classList.remove('hidden');
-        }
-        return;
-    }
-    const appName = `sec-create-${Date.now()}`;
-    const tmpApp = createSecondaryApp(appName);
-    const tmpAuth = getAuth(tmpApp);
-    try {
-        const cred = await createUserSecondary(tmpAuth, email, tempPass);
-        await setDoc(doc(db, 'users', cred.user.uid), withCompanyId({
-            email,
-            displayName: displayName || email.split('@')[0],
-            role,
-            status: 'active',
-            createdAt: serverTimestamp(),
-            createdBy: auth.currentUser.uid
-        }));
-        await sendPasswordResetEmail(tmpAuth, email);
-        showToast('User created. Password setup email sent.');
-        closeModal('modal-create-user');
-        await renderUserManagementTable();
-        await loadUserDirectoryForAssignments();
-    } catch (e) {
-        console.error(e);
-        if (errEl) {
-            errEl.textContent = e.message || 'Failed to create user';
-            errEl.classList.remove('hidden');
-        }
-    } finally {
-        try {
-            await deleteApp(tmpApp);
-        } catch (_) { /* noop */ }
-    }
-};
-
-window.renderUserManagementTable = async () => {
-    const tbody = document.getElementById('user-mgmt-table-body');
-    if (!tbody) return;
-    if (!perm.canManageUsers(userRole())) {
-        tbody.innerHTML = '';
-        return;
-    }
-    const searchVal = document.getElementById('user-mgmt-search')?.value.toLowerCase() || '';
-
-    try {
-        const snap = await getDocs(query(
-            collection(db, 'users'),
-            where('companyId', '==', currentUserProfile?.companyId || null),
-            limit(200)
-        ));
-        const allUsers = sortByDateDesc(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        const filteredUsers = allUsers.filter(u => {
-            const name = (u.displayName || '').toLowerCase();
-            const email = (u.email || '').toLowerCase();
-            return name.includes(searchVal) || email.includes(searchVal);
-        });
-
-        tbody.innerHTML = filteredUsers.map((u) => {
-            const statusColor = u.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500';
-            const roleColor = u.role === 'admin' ? 'bg-rose-100 text-rose-700' : u.role === 'manager' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700';
-
-            return `<tr class="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                <td class="py-4 px-4">
-                    <div class="flex flex-col">
-                        <span class="font-bold text-slate-800 dark:text-slate-200">${escapeHtml(u.displayName || 'No Name')}</span>
-                        <span class="text-[10px] text-slate-400 font-medium">${escapeHtml(u.email || '')}</span>
-                    </div>
-                </td>
-                <td class="py-4 px-4">
-                    <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${roleColor}">${escapeHtml(u.role || 'recruiter')}</span>
-                </td>
-                <td class="py-4 px-4">
-                    <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${statusColor}">${escapeHtml(u.status || 'active')}</span>
-                </td>
-                <td class="py-4 px-4 text-right">
-                    <div class="flex items-center justify-end gap-2">
-                        <button type="button" class="w-8 h-8 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-slate-400" 
-                            onclick="openEditUserModal('${u.id}', '${escapeHtml(u.displayName || '')}', '${escapeHtml(u.email || '')}', '${u.role}', '${u.status}')" title="Edit User">
-                            <i class="fas fa-edit text-xs"></i>
-                        </button>
-                        ${u.status === 'active'
-                    ? `<button type="button" class="w-8 h-8 flex items-center justify-center hover:bg-amber-50 hover:text-amber-600 rounded-lg transition-colors text-slate-400" onclick="adminSetUserStatus('${u.id}','disabled')" title="Disable User">
-                                <i class="fas fa-user-slash text-xs"></i>
-                               </button>`
-                    : `<button type="button" class="w-8 h-8 flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-colors text-slate-400" onclick="adminSetUserStatus('${u.id}','active')" title="Enable User">
-                                <i class="fas fa-user-check text-xs"></i>
-                               </button>`}
-                        <button type="button" class="w-8 h-8 flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-colors text-slate-400" 
-                            onclick="adminDeleteUser('${u.id}', '${escapeHtml(u.displayName || u.email)}')" title="Delete User">
-                            <i class="fas fa-trash-alt text-xs"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>`;
-        }).join('') || `<tr><td colspan="4" class="py-12 text-center text-slate-400"><i class="fas fa-search text-4xl mb-2 opacity-20"></i><p>No results for "${searchVal}"</p></td></tr>`;
-        updateUserSeatUsageBadge();
-    } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-red-500 font-bold bg-red-50 rounded-xl">${escapeHtml(e.message)}</td></tr>`;
-    }
-};
-
-window.openEditUserModal = (uid, name, email, role, status) => {
-    document.getElementById('edit-user-uid').value = uid;
-    document.getElementById('edit-user-name').value = name;
-    document.getElementById('edit-user-email').value = email;
-    document.getElementById('edit-user-role').value = role || 'recruiter';
-    document.getElementById('edit-user-status').value = status || 'active';
-    openModal('modal-edit-user');
-};
-
-window.adminSendResetEmailFromEdit = async () => {
-    const email = document.getElementById('edit-user-email').value;
-    if (!email) return;
-    try {
-        await sendPasswordResetEmail(auth, email);
-        showToast('Password reset email sent to ' + email);
-    } catch (e) {
-        alert('Failed to send reset email: ' + e.message);
-    }
-};
-
-window.submitEditUser = async () => {
-    if (!perm.canManageUsers(userRole())) return;
-    const uid = document.getElementById('edit-user-uid').value;
-    const displayName = document.getElementById('edit-user-name').value;
-    const role = document.getElementById('edit-user-role').value;
-    const status = document.getElementById('edit-user-status').value;
-
-    if (!displayName) {
-        alert('Name is required');
-        return;
-    }
-
-    try {
-        await updateDoc(doc(db, 'users', uid), {
-            displayName,
-            role,
-            status,
-            updatedAt: serverTimestamp(),
-            updatedBy: auth.currentUser.uid
-        });
-        showToast('User updated successfully');
-        closeModal('modal-edit-user');
-        await renderUserManagementTable();
-        await loadUserDirectoryForAssignments();
-    } catch (e) {
-        alert('Failed to update user: ' + e.message);
-    }
-};
-
-window.adminDeleteUser = async (uid, name) => {
-    if (!perm.canManageUsers(userRole())) return;
-    if (uid === auth.currentUser.uid) {
-        alert('You cannot delete your own account');
-        return;
-    }
-    if (!confirm(`Are you sure you want to delete user "${name}"? This will remove their profile from the system.`)) return;
-
-    try {
-        await deleteDoc(doc(db, 'users', uid));
-        showToast('User deleted successfully');
-        await renderUserManagementTable();
-        await loadUserDirectoryForAssignments();
-    } catch (e) {
-        alert('Failed to delete user: ' + e.message);
-    }
-};
-
-window.adminUpdateUserRole = async (uid, role) => {
-    if (!perm.canManageUsers(userRole())) return;
-    try {
-        await updateDoc(doc(db, 'users', uid), {
-            role,
-            updatedAt: serverTimestamp(),
-            updatedBy: auth.currentUser.uid
-        });
-        showToast('Role updated');
-        await loadUserDirectoryForAssignments();
-    } catch (e) {
-        alert(e.message);
-    }
-};
-
-window.adminSetUserStatus = async (uid, status) => {
-    if (!perm.canManageUsers(userRole())) return;
-    try {
-        await updateDoc(doc(db, 'users', uid), {
-            status,
-            updatedAt: serverTimestamp(),
-            updatedBy: auth.currentUser.uid
-        });
-        showToast('Status updated');
-        await renderUserManagementTable();
-        await loadUserDirectoryForAssignments();
-    } catch (e) {
-        alert(e.message);
-    }
-};
-
-window.runLegacyMigration = async () => {
-    if (!perm.canManageUsers(userRole())) return;
-    const statusEl = document.getElementById('migration-status');
-    const uid = auth.currentUser.uid;
-    let total = 0;
-    try {
-        const cid = requireActiveCompanyId();
-        for (const colName of ['candidates', 'interviews', 'offers']) {
-            const snap = await getDocs(companyQuery(db, colName, [limit(500)], cid));
-            let batch = writeBatch(db);
-            let ops = 0;
-            for (const d of snap.docs) {
-                const data = d.data();
-                if (data.ownerId) continue;
-                const patch = {
-                    ownerId: uid,
-                    assignedTo: Array.isArray(data.assignedTo) ? data.assignedTo : [],
-                    updatedBy: uid,
-                    updatedAt: serverTimestamp()
-                };
-                if (!data.companyId) patch.companyId = cid;
-                if (!data.createdBy) patch.createdBy = uid;
-                batch.update(d.ref, patch);
-                ops++;
-                total++;
-                if (ops >= 400) {
-                    await batch.commit();
-                    batch = writeBatch(db);
-                    ops = 0;
-                }
-            }
-            if (ops > 0) await batch.commit();
-        }
-        if (statusEl) statusEl.textContent = `Done. Assigned owner on ${total} document(s) missing ownerId.`;
-        showToast('Migration finished');
-    } catch (e) {
-        console.error(e);
-        if (statusEl) statusEl.textContent = `Error: ${e.message}`;
-    }
-};
 // --- DIALER QR LOGIN BRIDGE ---
 let qrBridgeUnsub = null;
 let qrBridgeTimer = null;

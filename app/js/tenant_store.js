@@ -16,7 +16,6 @@ export const TENANT_COLLECTIONS = Object.freeze({
     masters_designations: "masters_designations",
     masters_industries: "masters_industries",
     masters_sources: "masters_sources",
-    audit_logs: "audit_logs",
     presence: "presence",
     qr_bridges: "qr_bridges",
     remote_calls: "remote_calls"

@@ -11,11 +11,6 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
-        integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
     <link rel="stylesheet" href="/app/css/styles.css">
     <script>
@@ -32,11 +27,14 @@
                 } else {
                     document.documentElement.classList.remove('dark');
                 }
+                document.documentElement.setAttribute('data-theme', actualTheme);
             };
             applyTheme(savedTheme);
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
                 if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
                     applyTheme('system');
+                    const statusEl = document.getElementById('theme-status');
+                    if (statusEl) statusEl.innerText = 'Auto';
                 }
             });
         })();
@@ -574,12 +572,6 @@
                         <i class="fas fa-signature w-5 flex-shrink-0 text-center"></i> <span
                             class="sidebar-label whitespace-nowrap">Offer Letters</span>
                     </a>
-                    <a href="#" onclick="showSection('pdffiller')"
-                        class="sidebar-btn flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ease-out text-blue-500 hover-lift"
-                        id="btn-nav-pdffiller" style="color: var(--text-secondary)">
-                        <i class="fas fa-file-pdf w-5 flex-shrink-0 text-center"></i> <span
-                            class="sidebar-label whitespace-nowrap">PDF Filler</span>
-                    </a>
                     <div class="h-px bg-slate-200 dark:bg-slate-800 mx-3 my-2 opacity-50"></div>
                     <a href="#" onclick="showSection('messaging')"
                         class="sidebar-btn flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ease-out"
@@ -650,11 +642,7 @@
                     <div class="flex items-center gap-4">
                         <div id="presence-peers" class="flex items-center gap-1 presence-peer-stack"
                             title="Teammates online"></div>
-                        <label id="my-pipeline-toggle-wrap"
-                            class="hidden items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 cursor-pointer select-none">
-                            <input type="checkbox" id="my-pipeline-toggle" onchange="toggleMyPipelineOnly(this)">
-                            My pipeline
-                        </label>
+                        <!-- My pipeline toggle removed -->
                         <span id="nav-user-role-badge"
                             class="hidden text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"></span>
                         <span id="nav-subscription-badge"
@@ -684,18 +672,8 @@
                                     </p>
                                 </div>
                                 <div class="border-t border-slate-100 dark:border-slate-800 my-1"></div>
-                                <div class="profile-menu-item hidden" id="menu-item-usermgmt"
-                                    onclick="showSection('usermgmt')">
-                                    <i class="fas fa-users-cog text-rose-500"></i>
-                                    <span>Team Management</span>
-                                </div>
-                                <div class="profile-menu-item hidden" id="menu-item-activity"
-                                    onclick="showSection('activity')">
-                                    <i class="fas fa-history text-cyan-500"></i>
-                                    <span>Activity Log</span>
-                                </div>
                                 <div class="border-t border-slate-100 dark:border-slate-800 my-1"></div>
-                                <div class="profile-menu-item" id="theme-toggle" onclick="toggleTheme(event)">
+                                <div class="profile-menu-item" id="theme-toggle" role="button" tabindex="0">
                                     <i class="fa-solid fa-circle-half-stroke text-blue-500"></i>
                                     <span>Appearance</span>
                                     <div class="ml-auto flex items-center gap-1.5">
@@ -1154,14 +1132,26 @@
                                 </button>
                             </div>
 
-                            <div class="flex gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <div class="relative">
                                     <input type="text" id="archive-search" placeholder="Search archive..."
                                         oninput="filterArchive()"
-                                        class="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 transition-all pr-10">
+                                        class="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 transition-all pr-10 min-w-[200px]">
                                     <i
                                         class="fas fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                                 </div>
+                                <select id="archive-dept-filter" onchange="filterArchive()"
+                                    class="px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none">
+                                    <option value="all">All departments</option>
+                                </select>
+                                <select id="archive-sort" onchange="setArchiveSort(this.value)"
+                                    class="px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none">
+                                    <option value="hired-desc">Newest first</option>
+                                    <option value="hired-asc">Oldest first</option>
+                                    <option value="name-asc">Name A–Z</option>
+                                    <option value="ctc-desc">Highest CTC</option>
+                                </select>
+                                <span id="archive-result-count" class="text-xs font-bold text-slate-500 px-2"></span>
                                 <button onclick="exportArchiveCSV()"
                                     class="px-5 py-2.5 bg-blue-600 text-white rounded-2xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:brightness-110 transition-all">
                                     <i class="fas fa-file-export mr-2"></i>Data Export
@@ -1455,15 +1445,6 @@
                                     data-status="Signed">Signed</button>
                             </div>
 
-                            <!-- Template Selector -->
-                            <div class="flex items-center gap-3">
-                                <label class="text-xs font-bold text-slate-600 dark:text-slate-300">Template:</label>
-                                <select id="offer-template-selector" onchange="selectOfferTemplate(this.value)"
-                                    class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all">
-                                    <option value="">Select Template</option>
-                                </select>
-                            </div>
-
                             <!-- Bulk Actions Bar -->
                             <div id="offer-section-bulk-bar"
                                 class="hidden animate-in fade-in zoom-in-95 duration-200 flex items-center gap-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-200 dark:border-red-800">
@@ -1486,98 +1467,6 @@
                             <!-- Offers Injected Here -->
                         </div>
                     </div>
-
-
-                    <div id="section-pdffiller" class="hidden space-y-8 animate-fade-up">
-                        <div id="pdf-filler-manager"
-                            class="glass-card p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50">
-                            <div class="flex items-center justify-between mb-4">
-                                <h4 class="text-sm font-black text-slate-700 dark:text-slate-200">PDF Document Templates
-                                </h4>
-                                <span class="text-[10px] text-slate-400">GitHub/raw URL, map & fill PDFs</span>
-                            </div>
-                            <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 mb-4">
-                                <div class="space-y-2">
-                                    <label
-                                        class="text-xs font-black uppercase text-slate-500 dark:text-slate-400">Template
-                                        URL</label>
-                                    <div class="flex flex-col sm:flex-row gap-2">
-                                        <input id="offer-template-url-input" type="url" class="theme-input w-full"
-                                            placeholder="https://github.com/user/repo/blob/main/offer.pdf">
-                                        <button type="button" onclick="addOfferTemplateFromUrl()"
-                                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap">
-                                            <i class="fas fa-link"></i> Add URL
-                                        </button>
-                                    </div>
-                                    <input id="offer-template-name-input" type="text" class="theme-input w-full"
-                                        placeholder="Optional template name">
-                                </div>
-                                <label
-                                    class="w-full lg:w-auto flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-3 cursor-pointer text-xs font-black uppercase tracking-widest">
-                                    <i class="fas fa-file-upload"></i> Upload Legacy
-                                    <input id="offer-template-input" type="file" accept="application/pdf" class="hidden"
-                                        onchange="handleOfferTemplateUpload(event)">
-                                </label>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                                <div
-                                    class="bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-300">
-                                    Selected template: <span id="selected-offer-template-name">None</span></div>
-                                <div
-                                    class="bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-300">
-                                    Source: <span id="selected-offer-template-source">None</span></div>
-                                <div
-                                    class="bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-2 text-xs text-slate-500 dark:text-slate-300">
-                                    Pages: <span id="selected-offer-template-pages">-</span></div>
-                            </div>
-                            <div
-                                class="overflow-x-auto max-h-48 custom-scrollbar border border-slate-200 dark:border-slate-800 rounded-xl">
-                                <table class="w-full text-left text-xs" id="offer-template-list">
-                                    <thead>
-                                        <tr>
-                                            <th class="px-2 py-2 font-bold">Name</th>
-                                            <th class="px-2 py-2 font-bold">Source</th>
-                                            <th class="px-2 py-2 font-bold">Type</th>
-                                            <th class="px-2 py-2 font-bold">Fields</th>
-                                            <th class="px-2 py-2 font-bold">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td colspan="5" class="text-center text-slate-400 py-4">No templates
-                                                uploaded yet.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p id="offer-template-status" class="text-[10px] text-emerald-600 mt-2 hidden"></p>
-                        </div>
-
-                        <!-- PDF Fill with Candidate Data -->
-                        <div
-                            class="glass-card p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50">
-                            <h4 class="text-sm font-black text-slate-700 dark:text-slate-200 mb-4">Fill PDF with
-                                Candidate Data</h4>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="text-xs font-bold uppercase">Select Candidate</label>
-                                    <select id="pdf-filler-candidate-select" class="theme-input w-full">
-                                        <option value="">-- Choose Candidate --</option>
-                                    </select>
-                                </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <button type="button" onclick="previewPdfFromCandidate()"
-                                        class="w-full py-3 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white dark:text-slate-950 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all">
-                                        Preview
-                                    </button>
-                                    <button type="button" onclick="generatePdfFromCandidate()"
-                                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl transition-all">Generate
-                                        PDF</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
 
                     <div id="section-portalsettings" class="hidden space-y-6">
                         <div id="portal-settings-container">
@@ -1943,62 +1832,7 @@
                             </div>
                         </div>
 
-                        <!-- NEW: SEGMENTED REPORTS TITLE -->
-                        <div class="pt-8 border-t border-slate-200 dark:border-slate-800">
-                            <h4
-                                class="text-sm font-semibold uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-                                <i class="fas fa-chart-pie"></i> Database Segments & Portfolio Analytics
-                            </h4>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 pb-12">
-                            <!-- Master Portfolio Card -->
-                            <div class="glass-card p-6 rounded-3xl border transition-all hover:shadow-2xl hover:shadow-blue-500/10"
-                                style="border-color: var(--border-color); background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05))">
-                                <div class="flex items-center gap-4 mb-4">
-                                    <div
-                                        class="w-12 h-12 rounded-2xl bg-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-                                        <i class="fas fa-database text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-bold text-lg" style="color: var(--text-primary)">Master Database
-                                            Audit</h4>
-                                        <p class="text-xs" style="color: var(--text-muted)">The "All-in-One"
-                                            Consolidated Log</p>
-                                    </div>
-                                </div>
-                                <p class="text-sm mb-6" style="color: var(--text-secondary)">A massive report including
-                                    EVERY candidate across all 3 segments (Talent Pool, Pipeline, Archive) with segment
-                                    labels.</p>
-                                <button onclick="fetchMasterAuditReport()"
-                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 font-bold shadow-xl shadow-blue-500/20">
-                                    <i class="fas fa-file-invoice text-lg"></i> Download Master Snapshot
-                                </button>
-                            </div>
-
-                            <!-- Active Pipeline Snapshot -->
-                            <div class="glass-card p-6 rounded-3xl border transition-all hover:shadow-2xl"
-                                style="border-color: var(--border-color)">
-                                <div class="flex items-center gap-4 mb-4">
-                                    <div
-                                        class="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg">
-                                        <i class="fas fa-stream text-xl"></i>
-                                    </div>
-                                    <div>
-                                        <h4 class="font-bold text-lg" style="color: var(--text-primary)">Active Pipeline
-                                            Tracker</h4>
-                                        <p class="text-xs" style="color: var(--text-muted)">The In-Progress segment</p>
-                                    </div>
-                                </div>
-                                <p class="text-sm mb-6" style="color: var(--text-secondary)">Only candidates currently
-                                    in Screening, Interview, or Selected stages. Focuses on velocity and current
-                                    pipeline metrics.</p>
-                                <button onclick="fetchPipelineSnapshotReport()"
-                                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-2xl transition-all duration-300 flex items-center justify-center gap-3 font-bold shadow-xl">
-                                    <i class="fas fa-file-invoice text-lg"></i> Export Snapshot
-                                </button>
-                            </div>
-                        </div>
+                        <!-- Audit / reporting cards removed -->
                     </div>
                     <!-- MASTERS VIEW -->
                     <div id="section-masters" class="hidden space-y-6 animate-fade-up">
@@ -2114,74 +1948,6 @@
                         </div>
                         <!-- END MASTERS VIEW -->
 
-                    </div>
-
-                    <!-- USER MANAGEMENT (admin) -->
-                    <div id="section-usermgmt" class="hidden space-y-6 animate-fade-up">
-                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h2 class="text-2xl font-black text-slate-800 dark:text-white">User management</h2>
-                                <p class="text-sm text-slate-500">Provision accounts and roles · <span id="user-seat-usage" class="font-bold">—</span></p>
-                                <p class="text-xs text-slate-400 mt-1">Owner/Admin: full workspace · Manager: assign team · Recruiter: own pipeline · Viewer: read-only</p>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <div class="relative w-full md:w-64">
-                                    <i
-                                        class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                    <input type="text" id="user-mgmt-search" placeholder="Search users..."
-                                        oninput="renderUserManagementTable()"
-                                        class="w-full pl-10 pr-4 py-2.5 rounded-2xl border-none bg-white dark:bg-slate-800 shadow-sm text-xs focus:ring-2 focus:ring-blue-500/20 transition-all">
-                                </div>
-                                <button type="button" onclick="openCreateUserModal()"
-                                    class="px-5 py-2.5 bg-rose-600 text-white rounded-2xl text-xs font-bold shadow-lg flex-shrink-0">
-                                    <i class="fas fa-user-plus mr-2"></i>Add user
-                                </button>
-                            </div>
-                        </div>
-                        <div class="glass-card p-6 rounded-2xl overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead>
-                                    <tr
-                                        class="border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase text-slate-500 font-black tracking-widest">
-                                        <th class="py-3 px-4">User Details</th>
-                                        <th class="py-3 px-4">Role</th>
-                                        <th class="py-3 px-4">Status</th>
-                                        <th class="py-3 px-4 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="user-mgmt-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- ACTIVITY / AUDIT -->
-                    <div id="section-activity" class="hidden space-y-6 animate-fade-up">
-                        <h2 class="text-2xl font-black text-slate-800 dark:text-white">Activity log</h2>
-                        <div class="glass-card p-4 rounded-2xl overflow-x-auto">
-                            <table class="w-full text-left text-[11px]" id="activity-feed-table">
-                                <thead>
-                                    <tr class="border-b border-slate-200 dark:border-slate-700">
-                                        <th class="py-2">When</th>
-                                        <th class="py-2">Entity</th>
-                                        <th class="py-2">Action</th>
-                                        <th class="py-2">User</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- DATA MIGRATION -->
-                    <div id="section-migration" class="hidden space-y-6 animate-fade-up">
-                        <h2 class="text-2xl font-black text-slate-800 dark:text-white">Legacy data migration</h2>
-                        <p class="text-sm text-slate-500">One-time: set ownerId and audit fields on existing candidates,
-                            interviews, and offers (assigns to your account).</p>
-                        <button type="button" onclick="runLegacyMigration()"
-                            class="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-sm">
-                            Run migration
-                        </button>
-                        <p id="migration-status" class="text-sm text-slate-600 dark:text-slate-400"></p>
                     </div>
 
                 </div><!-- /#content-area -->
@@ -3040,13 +2806,6 @@
                             </div>
                         </div>
 
-                        <div
-                            class="form-group-card !bg-transparent border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                            <h5 class="font-bold text-xs uppercase text-slate-400 mb-2">Change history</h5>
-                            <div id="record-audit-body"
-                                class="max-h-40 overflow-y-auto text-[11px] text-slate-600 dark:text-slate-300"></div>
-                        </div>
-
                         <div class="pt-8 space-y-3">
                             <button type="submit"
                                 class="w-full h-14 rounded-2xl bg-blue-600 text-white font-black text-lg shadow-xl shadow-blue-500/20 hover:scale-[1.02] active:scale-98 transition-all shimmer">
@@ -3603,67 +3362,6 @@
         </div>
     </div>
 
-    <!-- MODAL: OFFER TEMPLATE MAPPER -->
-    <div id="offer-mapper-dialog" class="fixed inset-0 bg-black/70 z-[170] hidden flex items-center justify-center p-4">
-        <div
-            class="immersive-workspace w-full max-w-6xl h-[90vh] rounded-2xl bg-white dark:bg-slate-950 overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-700">
-            <div
-                class="workspace-header flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900">
-                <div>
-                    <h3 class="font-black text-xl text-slate-900 dark:text-white">Map PDF Template Fields</h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-300">Immersive field mapper. Use panel, click to
-                        place, then adjust coords.</p>
-                </div>
-                <button onclick="closeOfferTemplateMapper()"
-                    class="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center"><i
-                        class="fas fa-times"></i></button>
-            </div>
-            <div class="workspace-body flex flex-col lg:flex-row h-full">
-                <div class="w-full lg:w-3/5 border-r border-slate-200 dark:border-slate-800 relative overflow-hidden">
-                    <canvas id="offer-mapper-canvas" class="w-full h-full"></canvas>
-                    <div id="offer-mapper-markers-layer" class="absolute inset-0 pointer-events-none"></div>
-                    <div id="offer-mapper-click-layer" onclick="onOfferMapperClick(event)"
-                        class="absolute inset-0 bg-transparent cursor-crosshair"></div>
-                </div>
-                <div class="w-full lg:w-2/5 p-4 flex flex-col gap-3 overflow-y-auto bg-slate-50 dark:bg-slate-900">
-                    <div class="space-y-2">
-                        <div class="text-xs text-slate-500">Template:</div>
-                        <div id="offer-mapper-template-name" class="text-sm font-bold"></div>
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold uppercase">Field to place</label>
-                        <select id="offer-mapper-field-select" onchange="onOfferMapperFieldChoose(this.value)"
-                            class="theme-input text-xs w-full"></select>
-                    </div>
-                    <div class="space-y-2">
-                        <p class="text-xs text-slate-500">Mapped positions (PDF coordinates):</p>
-                        <p id="offer-mapper-status" class="text-xs text-blue-600">Select a field then click preview to
-                            set coordinates.</p>
-                        <div class="overflow-auto max-h-[36vh] custom-scrollbar">
-                            <table class="w-full text-xs text-left">
-                                <thead>
-                                    <tr>
-                                        <th class="p-2">Field</th>
-                                        <th class="p-2">X</th>
-                                        <th class="p-2">Y</th>
-                                        <th class="p-2">Size</th>
-                                        <th class="p-2">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="offer-mapper-table-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="pt-3">
-                        <button onclick="saveOfferTemplateMapping()"
-                            class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold">Save
-                            Mapping</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- MODAL: CANDIDATE REJECTION (Immersive Overhaul) -->
     <div id="modal-reject"
         class="fixed inset-0 bg-red-900/80 backdrop-blur-md z-[107] hidden flex items-center justify-center p-0 sm:p-4">
@@ -3884,102 +3582,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Modal: Create user (admin) -->
-    <div id="modal-create-user"
-        class="fixed inset-0 z-[210] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div
-            class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200 dark:border-slate-700">
-            <h3 class="text-lg font-black text-slate-800 dark:text-white mb-6">Add user</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="field-label">Email</label>
-                    <input type="email" id="create-user-email" class="theme-input w-full" required>
-                </div>
-                <div>
-                    <label class="field-label">Display name</label>
-                    <input type="text" id="create-user-name" class="theme-input w-full">
-                </div>
-                <div>
-                    <label class="field-label">Role</label>
-                    <select id="create-user-role" class="theme-input w-full">
-                        <option value="recruiter">Recruiter — own candidates &amp; dialer</option>
-                        <option value="manager">Manager — assign team &amp; all pipelines</option>
-                        <option value="admin">Admin — users, settings, analytics</option>
-                        <option value="viewer">Viewer — read-only</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="field-label">Temporary password</label>
-                    <input type="password" id="create-user-temp-pass" class="theme-input w-full"
-                        placeholder="Min 6 characters" required autocomplete="new-password">
-                </div>
-                <p id="create-user-error" class="text-xs text-red-500 hidden"></p>
-            </div>
-            <div class="flex gap-3 mt-8">
-                <button type="button" onclick="submitCreateUser()"
-                    class="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold text-sm">Create &amp; send
-                    reset</button>
-                <button type="button" onclick="closeModal('modal-create-user')"
-                    class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-xl font-bold text-sm">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Edit user (admin) -->
-    <div id="modal-edit-user"
-        class="fixed inset-0 z-[210] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div
-            class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-slate-200 dark:border-slate-700">
-            <h3 class="text-lg font-black text-slate-800 dark:text-white mb-6">Edit User</h3>
-            <input type="hidden" id="edit-user-uid">
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Email
-                        (Read Only)</label>
-                    <input type="text" id="edit-user-email" readonly
-                        class="theme-input w-full bg-slate-50 dark:bg-slate-800/50 opacity-70">
-                </div>
-                <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Full
-                        Name</label>
-                    <input type="text" id="edit-user-name" placeholder="Name" class="theme-input w-full">
-                </div>
-                <div>
-                    <label
-                        class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Role</label>
-                    <select id="edit-user-role" class="theme-input w-full">
-                        <option value="recruiter">Recruiter</option>
-                        <option value="manager">Manager</option>
-                        <option value="admin">Admin</option>
-                        <option value="viewer">Viewer</option>
-                    </select>
-                </div>
-                <div>
-                    <label
-                        class="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Status</label>
-                    <select id="edit-user-status" class="theme-input w-full">
-                        <option value="active">Active</option>
-                        <option value="disabled">Disabled</option>
-                    </select>
-                </div>
-            </div>
-            <div class="mt-6">
-                <button type="button" onclick="adminSendResetEmailFromEdit()"
-                    class="w-full py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all">
-                    <i class="fas fa-envelope-open-text mr-2 text-blue-500"></i>Send Password Reset Email
-                </button>
-            </div>
-            <div class="flex gap-3 mt-8">
-                <button type="button" onclick="submitEditUser()"
-                    class="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm">Save Changes</button>
-                <button type="button" onclick="closeModal('modal-edit-user')"
-                    class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 rounded-xl font-bold text-sm">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="/app/js/pdf_service.js"></script>
     <script type="module" src="/app/js/firebase_config.js"></script>
     <script type="module" src="/app/js/script.js"></script>
 
