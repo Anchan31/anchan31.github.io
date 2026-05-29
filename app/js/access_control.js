@@ -13,7 +13,6 @@ export const FEATURES = {
     recruitModule: "recruitModule",
     careerPortal: "careerPortal",
     shareProfile: "shareProfile",
-    dialer: "dialer",
     qrBridgeLogin: "qrBridgeLogin",
     advancedAnalytics: "advancedAnalytics"
 };
@@ -61,7 +60,6 @@ const RESERVED_HOSTS = new Set([
     "app",
     "candidate",
     "careers",
-    "dialer",
     "share",
     "nextgenudaan",
     "www",
@@ -85,7 +83,6 @@ const MODULE_PERMISSIONS = {
     [FEATURES.recruitModule]: [PERMISSIONS.fullAccess, PERMISSIONS.manageJobs, PERMISSIONS.manageCandidates, PERMISSIONS.readOnly],
     [FEATURES.careerPortal]: [PERMISSIONS.fullAccess, PERMISSIONS.manageJobs, PERMISSIONS.readOnly],
     [FEATURES.shareProfile]: [PERMISSIONS.fullAccess, PERMISSIONS.shareProfiles],
-    [FEATURES.dialer]: [PERMISSIONS.fullAccess, PERMISSIONS.useDialer],
     [FEATURES.qrBridgeLogin]: [PERMISSIONS.fullAccess, PERMISSIONS.useQrBridgeLogin]
 };
 

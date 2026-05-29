@@ -9,7 +9,6 @@ export const PERMISSIONS = {
     manageBilling: "manage_billing",
     manageJobs: "manage_jobs",
     manageCandidates: "manage_candidates",
-    useDialer: "use_dialer",
     shareProfiles: "share_profiles",
     readOnly: "read_only",
     viewAnalytics: "view_analytics",
@@ -31,7 +30,6 @@ export const ROLE_DEFINITIONS = {
             PERMISSIONS.manageCandidates,
             PERMISSIONS.viewAnalytics,
             PERMISSIONS.shareProfiles,
-            PERMISSIONS.useDialer,
             PERMISSIONS.useQrBridgeLogin
         ]
     },
@@ -43,7 +41,6 @@ export const ROLE_DEFINITIONS = {
             PERMISSIONS.manageCandidates,
             PERMISSIONS.viewAnalytics,
             PERMISSIONS.shareProfiles,
-            PERMISSIONS.useDialer,
             PERMISSIONS.useQrBridgeLogin
         ]
     },
@@ -52,8 +49,7 @@ export const ROLE_DEFINITIONS = {
         label: "Recruiter",
         permissions: [
             PERMISSIONS.manageCandidates,
-            PERMISSIONS.shareProfiles,
-            PERMISSIONS.useDialer
+            PERMISSIONS.shareProfiles
         ]
     },
     viewer: {

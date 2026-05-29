@@ -23,7 +23,6 @@ const PLAN_FEATURES = [
   'recruitModule',
   'careerPortal',
   'shareProfile',
-  'dialer',
   'qrBridgeLogin',
   'advancedAnalytics'
 ];
@@ -85,6 +84,7 @@ module.exports = async (req, res) => {
       subscriptionId: subscriptionId,
       plan: plan.id,
       maxUsers: plan.maxUsers,
+      aiCreditsRemaining: 0,
       features: PLAN_FEATURES,
       customLimits: {},
       status: "active",

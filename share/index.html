@@ -428,7 +428,7 @@
         function fmt(n) { return Number(n || 0).toLocaleString('en-IN'); }
 
         const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['trialing', 'active', 'grace']);
-        const RESERVED_HOSTS = new Set(['anchan31', 'access', 'app', 'candidate', 'careers', 'dialer', 'share', 'nextgenudaan', 'www', 'localhost', '127']);
+        const RESERVED_HOSTS = new Set(['anchan31', 'access', 'app', 'candidate', 'careers', 'share', 'nextgenudaan', 'www', 'localhost', '127']);
 
         function normalizeClientId(value = '') {
             return value.toString().toLowerCase().trim()
@@ -494,7 +494,7 @@
                 ? subscription.customFeatures
                 : Array.isArray(company.features) && company.features.length
                     ? company.features
-                    : ['recruitModule', 'careerPortal', 'shareProfile', 'dialer', 'qrBridgeLogin', 'advancedAnalytics'];
+                    : ['recruitModule', 'careerPortal', 'shareProfile', 'qrBridgeLogin', 'advancedAnalytics'];
             if (!features.includes('shareProfile')) throw new Error('Share portal is not enabled for this workspace.');
         }
 

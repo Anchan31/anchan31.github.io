@@ -6,8 +6,6 @@ module.exports = {
     "./app/**/*.js",
     "./careers/**/*.html",
     "./careers/**/*.js",
-    "./dialer/**/*.html",
-    "./dialer/**/*.js",
     "./share/**/*.html",
     "./share/**/*.js"
   ],

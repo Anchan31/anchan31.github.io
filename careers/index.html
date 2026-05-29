@@ -1736,38 +1736,41 @@
 
         const getCompanyId = () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const param = urlParams.get('companyId') || urlParams.get('company') || urlParams.get('cid');
-            if (param) return param.toLowerCase();
-
-            const hostname = window.location.hostname;
+            const hostname = window.location.hostname.toLowerCase();
             const parts = hostname.split('.');
+            const reserved = new Set(['www', 'anchan31', 'access', 'app', 'share', 'careers', 'nextgenudaan', 'localhost', '127']);
             if (parts.length > 2) {
-                const sub = parts[0].toLowerCase();
-                if (sub !== 'www' && sub !== 'anchan31' && sub !== 'nextgenudaan' && sub !== 'localhost' && sub !== '127') {
+                const sub = normalizeClientId(parts[0]);
+                if (!reserved.has(sub)) {
                     return sub;
                 }
             }
+
+            const param = urlParams.get('companyId') || urlParams.get('company') || urlParams.get('cid') || urlParams.get('clientId') || urlParams.get('subdomain');
+            if (param) return normalizeClientId(param);
+
             return null;
         };
 
         const resolveCompanyId = async () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const param = urlParams.get('companyId') || urlParams.get('company') || urlParams.get('cid');
+            const hostname = window.location.hostname.toLowerCase();
+            const parts = hostname.split('.');
+            const reserved = new Set(['www', 'anchan31', 'access', 'app', 'share', 'careers', 'nextgenudaan', 'localhost', '127']);
+            if (parts.length > 2) {
+                const sub = normalizeClientId(parts[0]);
+                if (!reserved.has(sub)) {
+                    const company = await loadCompanyByClientId(db, sub);
+                    return company ? company.id : null;
+                }
+            }
+
+            const param = urlParams.get('companyId') || urlParams.get('company') || urlParams.get('cid') || urlParams.get('clientId') || urlParams.get('subdomain');
             if (param) {
-                const company = await loadCompanyByClientId(param);
+                const company = await loadCompanyByClientId(db, param);
                 return company ? company.id : normalizeClientId(param);
             }
 
-            const hostname = window.location.hostname.toLowerCase();
-            const parts = hostname.split('.');
-            if (parts.length > 2) {
-                const sub = normalizeClientId(parts[0]);
-                if (['www', 'anchan31', 'nextgenudaan', 'localhost', '127'].includes(sub)) {
-                    return null;
-                }
-                const company = await loadCompanyByClientId(sub);
-                return company ? company.id : null;
-            }
             return null;
         };
 
@@ -2187,6 +2190,7 @@
                     uploadedResumeUrl = data.secure_url;
                     resumeUrlHidden.value = data.secure_url;
                     resumeUploadLabel.innerHTML = `<i class="fas fa-check text-emerald-500 mr-2"></i> ${file.name}`;
+                    await suggestProfileFromResume(data.secure_url);
                     setTimeout(() => { resumeProgressBar.classList.add('hidden'); }, 1000);
                 } else {
                     throw new Error(data.error?.message || "Upload failed");
@@ -2198,6 +2202,70 @@
                 resumeProgressBar.classList.add('hidden');
             }
         });
+
+        async function suggestProfileFromResume(resumeUrl) {
+            if (!currentUser || !resumeUrl) return;
+            const shouldParse = confirm("Use 1 AI credit to read this resume and autofill profile details for review?");
+            if (!shouldParse) return;
+
+            try {
+                resumeUploadLabel.innerText = 'AI is reading your resume...';
+                const token = await currentUser.getIdToken();
+                const response = await fetch('/api/ai/parse-resume', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        companyId: getCompanyId(),
+                        resumeUrl
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.error || 'Resume parsing failed.');
+
+                applyResumeSuggestions(payload.parsed || {});
+                alert("AI suggestions were added to the form. Please review every field before submitting.");
+                resumeUploadLabel.innerHTML = `<i class="fas fa-check text-emerald-500 mr-2"></i> Resume uploaded and parsed`;
+            } catch (error) {
+                console.error("Resume AI parsing failed:", error);
+                alert("Resume uploaded, but AI autofill failed: " + error.message);
+                resumeUploadLabel.innerHTML = `<i class="fas fa-check text-emerald-500 mr-2"></i> Resume uploaded`;
+            }
+        }
+
+        function applyResumeSuggestions(parsed) {
+            const form = document.getElementById('form-profile');
+            if (!form || !parsed) return;
+            const map = {
+                name: parsed.name,
+                phone: parsed.phone,
+                city: parsed.city,
+                state: parsed.state,
+                addressLine1: parsed.addressLine1,
+                addressLine2: parsed.addressLine2,
+                pincode: parsed.pincode,
+                qualification: parsed.qualification,
+                experience: parsed.experience,
+                currentCompany: parsed.currentCompany,
+                currentDesignation: parsed.currentDesignation,
+                summary: parsed.summary
+            };
+            Object.entries(map).forEach(([name, value]) => {
+                const field = form.elements[name];
+                if (field && value && !field.value) field.value = value;
+            });
+            if (parsed.gender) {
+                const gender = form.querySelector(`[name="gender"][value="${String(parsed.gender).replace(/"/g, '\\"')}"]`);
+                if (gender) gender.checked = true;
+            }
+            if (parsed.skills) {
+                const skillsValue = Array.isArray(parsed.skills) ? parsed.skills.join(', ') : parsed.skills;
+                const skillsField = form.elements.skills || document.getElementById('skills-input');
+                if (skillsField && !skillsField.value) skillsField.value = skillsValue;
+            }
+        }
 
         // Aadhaar Upload (Cloudinary)
         const aadhaarFileInput = document.getElementById('aadhaar-file-input');

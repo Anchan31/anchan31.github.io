@@ -15,23 +15,8 @@ export const firebaseConfig = {
     measurementId: "G-87FVXXYEP7"
 };
 
-/** Configuration for the central Access Portal / Billing Hub */
-export const hubConfig = {
-    apiKey: "AIzaSyDhsrCX281ohlvo8Z3MKak0wYzISCND8x8",
-    authDomain: "recruit-a.firebaseapp.com",
-    projectId: "recruit-a",
-    storageBucket: "recruit-a.firebasestorage.app",
-    messagingSenderId: "564795783977",
-    appId: "1:564795783977:web:47278f0aa8116192abd538",
-    measurementId: "G-3RQJ52TLKW"
-};
-
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-
-/** Hub App for central authorization */
-export const hubApp = initializeApp(hubConfig, "Hub-Auth");
-export const hubDb = initializeFirestore(hubApp, {});
 
 // Set session persistence - login required when all browser tabs are closed
 setPersistence(auth, browserSessionPersistence);

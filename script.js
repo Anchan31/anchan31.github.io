@@ -122,12 +122,6 @@ const suiteData = {
         features: ["Secure Token Links", "Inline Document Preview", "Feedback Collection Bridge"],
         img: "./src/images/app_share.png"
     },
-    dialer: {
-        title: "Remote Dialer",
-        desc: "Bridge the desktop-mobile gap. Trigger calls on your smartphone directly from your recruitment dashboard via a secure QR bridge.",
-        features: ["Instant QR-Handshake", "Real-Time Sync Protocol", "Call Outcome Logging"],
-        img: "./src/images/app_dailer.png"
-    }
 };
 
 function switchTab(tabKey) {
@@ -263,7 +257,7 @@ async function processSubscription(userDetails) {
     try {
         const { name, email, company, mobile, planId, planName } = userDetails;
         const planSlug = planId === 'plan_SoAKfnYYCTZHDo' ? 'professional' : planId === 'plan_SouJvWzj8xFSgg' ? 'enterprise' : 'starter';
-        const planFeatures = ['recruitModule', 'careerPortal', 'shareProfile', 'dialer', 'qrBridgeLogin', 'advancedAnalytics'];
+        const planFeatures = ['recruitModule', 'careerPortal', 'shareProfile', 'qrBridgeLogin', 'advancedAnalytics'];
 
         // Calculate start_at exactly 14 days from now for a 14-days trial
         const now = new Date();

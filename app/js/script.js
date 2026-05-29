@@ -1,7 +1,7 @@
 import {
     auth, db, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
     createUserWithEmailAndPassword as createUserSecondary,
-    createSecondaryApp, deleteApp, firebaseConfig, hubDb,
+    createSecondaryApp, deleteApp, firebaseConfig,
     collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, setDoc, query, where, orderBy, writeBatch, limit, runTransaction, startAfter
 } from "./firebase_config.js";
 import * as perm from "./permissions.js";
@@ -855,8 +855,6 @@ async function handleLogin() {
     try {
         sessionStorage.setItem('tenant_client_id', clientId);
         await signInWithEmailAndPassword(auth, email, pass);
-        // Store password temporarily for Dialer QR Login bridge
-        sessionStorage.setItem('dialer_bridge_pass', pass);
     } catch (err) {
         sessionStorage.removeItem('tenant_client_id');
         showError(err.message);
@@ -977,32 +975,6 @@ async function ensureUserProfile(user) {
     const snap = await getDoc(ref);
     if (snap.exists()) {
         return { id: user.uid, ...snap.data() };
-    }
-
-    // Modernization: Check Central Hub (recruit-a) for Access Pass
-    try {
-        const hubUserSnap = await getDoc(doc(hubDb, 'users', user.uid));
-        if (hubUserSnap.exists()) {
-            const hubUser = hubUserSnap.data();
-            
-            // Check if user has an active company and role in the hub
-            if (hubUser.companyId && hubUser.role && hubUser.status === 'active') {
-                // Auto-provision in this local project
-                const localProfile = {
-                    email: user.email,
-                    displayName: hubUser.name || user.displayName || user.email.split('@')[0],
-                    role: hubUser.role,
-                    companyId: hubUser.companyId,
-                    status: 'active',
-                    createdAt: serverTimestamp(),
-                    provisionedVia: 'hub_access_pass'
-                };
-                await setDoc(ref, localProfile);
-                return { id: user.uid, ...localProfile };
-            }
-        }
-    } catch (e) {
-        console.warn('Hub verification failed', e);
     }
 
     const em = (user.email || '').toLowerCase();
@@ -5631,8 +5603,8 @@ window.showSection = async (sectionId) => {
             },
 
             'contacts': {
-                title: 'Contacts & Dialer',
-                subtitle: 'Manage talent network and initiate remote calls',
+                title: 'Contacts',
+                subtitle: 'Manage talent network and candidate contact details',
                 actions: [
                     { label: 'Import Contacts', icon: 'fa-file-import', color: 'bg-indigo-600', onclick: "showToast('Importing contacts...')" }
                 ]
@@ -6856,14 +6828,17 @@ window.showCandidateProfile = (id) => {
     const sidebarActions = document.getElementById('profile-sidebar-actions');
     if (sidebarActions) {
         sidebarActions.innerHTML = `
-            <button onclick="initiateRemoteCall('${c.phone}', '${c.name.replace(/'/g, "\\'")}')" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20">
-                <i class="fas fa-phone"></i> Call Now
+            <button onclick="window.open('tel:${c.phone || ''}', '_self')" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20">
+                <i class="fas fa-phone"></i> Call
             </button>
             <button onclick="window.open('https://wa.me/91${c.phone}', '_blank')" class="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">
                 <i class="fab fa-whatsapp text-emerald-500"></i> WhatsApp
             </button>
             <button onclick="window.open('mailto:${c.email}', '_blank')" class="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">
                 <i class="fas fa-envelope text-blue-500"></i> Send Email
+            </button>
+            <button onclick="generateInterviewQuestions('${c.id}')" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-500/20">
+                <i class="fas fa-wand-magic-sparkles"></i> AI Questions
             </button>
         `;
     }
@@ -7010,29 +6985,52 @@ window.saveCandidateNote = async (candidateId) => {
     }
 };
 
-window.initiateRemoteCall = async (phoneNumber, candidateName) => {
-    if (!currentUser) {
-        if (typeof showToast === 'function') showToast("Please log in first", "error");
-        else alert("Please log in first");
-        return;
-    }
+window.generateInterviewQuestions = async (candidateId) => {
+    const candidate = cachedCandidates.find(c => c.id === candidateId);
+    if (!candidate) return showToast('Candidate not found', 'error');
+    if (!currentUser || !currentUserProfile?.companyId) return showToast('Please sign in again.', 'error');
 
+    const useCredit = confirm('Use 1 AI credit to generate interview questions for this candidate?');
+    if (!useCredit) return;
+
+    const job = cachedJobs.find(j => j.id === candidate.jobId || j.title === candidate.jobId || j.title === candidate.appliedFor);
     try {
-        const callRef = doc(db, "remote_calls", currentUser.uid);
-        await setDoc(callRef, withCompanyId({
-            phoneNumber: phoneNumber,
-            candidateName: candidateName,
-            status: 'pending',
-            timestamp: serverTimestamp(),
-            uid: currentUser.uid,
-            email: currentUser.email
+        showToast('Generating interview questions...');
+        const token = await currentUser.getIdToken();
+        const response = await fetch('/api/ai/interview-questions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                companyId: currentUserProfile.companyId,
+                jobTitle: job?.title || candidate.appliedFor || candidate.position || '',
+                jobDescription: job?.description || job?.jobDescription || '',
+                skills: candidate.skills || candidate.tags || job?.skills || '',
+                candidateSummary: candidate.notes || candidate.summary || candidate.screenerNotes || '',
+                difficulty: 'mid'
+            })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Question generation failed.');
+
+        const questions = payload.generated?.questions || [];
+        const preview = questions.map((q, index) => `${index + 1}. ${q.question || q}`).join('\n\n');
+        const shouldSave = confirm(`${preview || 'Questions generated.'}\n\nSave these questions to this candidate profile?`);
+        if (!shouldSave) return;
+
+        await updateDoc(doc(db, 'candidates', candidateId), stampOwnedUpdate({
+            aiInterviewQuestionsDraft: questions,
+            aiInterviewQuestionsGeneratedAt: serverTimestamp(),
+            aiInterviewQuestionsGeneratedBy: currentUser.uid
         }));
-        if (typeof showToast === 'function') showToast(`Calling ${candidateName}... Check your phone.`, "success");
-        else alert(`Calling ${candidateName}... Check your phone.`);
+        candidate.aiInterviewQuestionsDraft = questions;
+        showToast('AI interview questions saved.');
+        showCandidateProfile(candidateId);
     } catch (error) {
-        console.error("Error initiating remote call:", error);
-        if (typeof showToast === 'function') showToast("Failed to initiate call", "error");
-        else alert("Failed to initiate call");
+        console.error('AI question generation failed:', error);
+        showToast(error.message || 'AI question generation failed.', 'error');
     }
 };
 
@@ -8095,10 +8093,8 @@ window.nextCalendarMonth = () => {
 };
 
 /* ==========================================================================
-   CONTACTS & DIALER LOGIC
+   CONTACTS LOGIC
    ========================================================================== */
-
-let dialerCallLogs = JSON.parse(localStorage.getItem('dialerCallLogs') || '[]');
 
 window.renderContactsSection = () => {
     const tableBody = document.getElementById('contacts-table-body');
@@ -8114,7 +8110,7 @@ window.renderContactsSection = () => {
                     <div class="flex flex-col items-center gap-4 opacity-30">
                         <i class="fas fa-address-book text-5xl"></i>
                         <p class="font-bold uppercase tracking-widest text-xs">No saved contacts yet</p>
-                        <p class="text-[10px] max-w-xs mx-auto">Mark candidates as "Save to Contacts" from their profile or the dialer to see them here.</p>
+                        <p class="text-[10px] max-w-xs mx-auto">Mark candidates as "Save to Contacts" from their profile to see them here.</p>
                     </div>
                 </td>
             </tr>`;
@@ -8122,7 +8118,6 @@ window.renderContactsSection = () => {
     }
 
     renderContactsTable(contacts);
-    renderMiniCallLogs();
 };
 
 window.toggleContactStatus = async (id) => {
@@ -8196,7 +8191,7 @@ function renderContactsTable(contacts) {
                 <td class="px-4 py-4 text-xs font-medium text-slate-600 dark:text-slate-400">${c.company || 'N/A'}</td>
                 <td class="px-4 py-4">
                     <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="quickDial('${c.phone}')" class="action-btn-circle bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" title="Quick Call">
+                        <button onclick="window.open('tel:${c.phone || ''}', '_self')" class="action-btn-circle bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400" title="Call">
                             <i class="fas fa-phone"></i>
                         </button>
                         <button onclick="window.open('https://wa.me/91${c.phone}', '_blank')" class="action-btn-circle bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400" title="WhatsApp Message">
@@ -8219,117 +8214,6 @@ window.filterContacts = (term) => {
         (c.position && c.position.toLowerCase().includes(term.toLowerCase()))
     );
     renderContactsTable(filtered);
-};
-
-window.dialPadPush = (val) => {
-    const input = document.getElementById('dialer-input');
-    if (input.value.length < 15) {
-        input.value += val;
-        // Trigger input event for any listeners
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        // Simple haptic feedback simulation
-        if (window.navigator.vibrate) window.navigator.vibrate(10);
-    }
-};
-
-window.dialPadClear = () => {
-    const input = document.getElementById('dialer-input');
-    input.value = input.value.slice(0, -1);
-};
-
-window.quickDial = (phone) => {
-    if (!phone) return showToast("No phone number available");
-    const cleanPhone = phone.replace(/\D/g, '');
-    document.getElementById('dialer-input').value = cleanPhone;
-    initiateDialerCall();
-};
-
-window.initiateDialerCall = async () => {
-    const phone = document.getElementById('dialer-input').value;
-    if (!phone || phone.length < 10) {
-        showToast("Please enter a valid phone number");
-        return;
-    }
-
-    const cleanPhone = phone.replace(/\D/g, '');
-
-    // Add to local logs
-    const contact = cachedCandidates.find(c => c.phone && c.phone.replace(/\D/g, '') === cleanPhone);
-    const logEntry = {
-        name: contact ? contact.name : 'Unknown',
-        phone: cleanPhone,
-        timestamp: new Date().toISOString(),
-        id: Date.now()
-    };
-
-    dialerCallLogs.unshift(logEntry);
-    if (dialerCallLogs.length > 20) dialerCallLogs.pop();
-    localStorage.setItem('dialerCallLogs', JSON.stringify(dialerCallLogs));
-
-    renderMiniCallLogs();
-
-    // Firebase Integration
-    await initiateRemoteCall(cleanPhone);
-};
-
-async function initiateRemoteCall(phoneNumber) {
-    if (!auth.currentUser) return showToast("Please sign in to use the dialer");
-
-    try {
-        // Find candidate name from the UI context if possible
-        let candidateName = "Manual Dial";
-        const immersiveName = document.querySelector('.immersive-workspace .workspace-sidebar h4')?.innerText;
-        if (immersiveName && immersiveName !== "New Partner" && immersiveName !== "Candidate Name") {
-            candidateName = immersiveName;
-        }
-
-        // Use setDoc with User UID as the document ID for the remote dialer app to listen correctly
-        await setDoc(doc(db, "remote_calls", auth.currentUser.uid), withCompanyId({
-            phoneNumber: phoneNumber,
-            candidateName: candidateName,
-            status: "pending",
-            callerName: auth.currentUser?.displayName || "Recruiter",
-            callerEmail: auth.currentUser?.email || "unknown",
-            timestamp: serverTimestamp()
-        }));
-        showToast("Request sent to Remote Dialer!");
-    } catch (e) {
-        console.error("Dialer error:", e);
-        showToast("Remote dialer sync failed");
-    }
-}
-
-function renderMiniCallLogs() {
-    const container = document.getElementById('mini-call-logs');
-    if (!container) return;
-
-    if (dialerCallLogs.length === 0) {
-        container.innerHTML = `<div class="text-center py-6 opacity-40"><i class="fas fa-history text-xl mb-2"></i><p class="text-[10px]">No recent calls</p></div>`;
-        return;
-    }
-
-    container.innerHTML = dialerCallLogs.map(log => `
-        <div class="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all cursor-default">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-500 flex items-center justify-center text-xs">
-                    <i class="fas fa-phone-arrow-up-right"></i>
-                </div>
-                <div>
-                    <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[100px]">${log.name}</div>
-                    <div class="text-[9px] text-slate-500">${new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                </div>
-            </div>
-            <button onclick="quickDial('${log.phone}')" class="text-blue-500 hover:text-blue-600 p-1">
-                <i class="fas fa-rotate-right text-[10px]"></i>
-            </button>
-        </div>
-    `).join('');
-}
-
-window.clearCallLogs = () => {
-    dialerCallLogs = [];
-    localStorage.setItem('dialerCallLogs', '[]');
-    renderMiniCallLogs();
 };
 
 function getInitials(name) {
@@ -9265,139 +9149,3 @@ window.populateCandidateMastersData = function () {
 };
 
 
-// --- DIALER QR LOGIN BRIDGE ---
-let qrBridgeUnsub = null;
-let qrBridgeTimer = null;
-
-window.openDialerQRLogin = () => {
-    openModal('modal-dialer-qr');
-    generateDialerLoginQR();
-};
-
-window.generateDialerLoginQR = async () => {
-    const container = document.getElementById('qr-container');
-    const status = document.getElementById('qr-status');
-    const timerEl = document.getElementById('qr-timer');
-    const approvalBox = document.getElementById('qr-approval-box');
-
-    if (!container) return;
-
-    // Clear previous state
-    if (qrBridgeUnsub) qrBridgeUnsub();
-    if (qrBridgeTimer) clearInterval(qrBridgeTimer);
-    approvalBox.classList.add('hidden');
-    status.innerText = "Generating secure bridge...";
-
-    // Clear container
-    container.innerHTML = '';
-
-    const bridgeId = Math.random().toString(36).substring(2, 15);
-    const secret = Math.random().toString(36).substring(2, 15);
-    const expiresAt = Date.now() + 60000; // 1 minute expiry
-
-    try {
-        // Create bridge document
-        await setDoc(doc(db, 'qr_bridges', bridgeId), withCompanyId({
-            status: 'pending',
-            createdAt: serverTimestamp(),
-            expiresAt: expiresAt,
-            desktopUid: auth.currentUser.uid,
-            desktopEmail: auth.currentUser.email
-        }));
-
-        // Generate QR Code (bridgeId:secret)
-        const qrData = `${bridgeId}:${secret}`;
-
-        new QRCode(container, {
-            text: qrData,
-            width: 256,
-            height: 256,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-        });
-
-        status.innerText = "Scan this with your mobile dialer.";
-
-        // Start Timer
-        let timeLeft = 60;
-        qrBridgeTimer = setInterval(() => {
-            timeLeft--;
-            timerEl.innerText = timeLeft;
-            if (timeLeft <= 0) {
-                cleanupDialerBridge(bridgeId);
-                closeModal('modal-dialer-qr');
-            }
-        }, 1000);
-
-        // Listen for Handshake
-        qrBridgeUnsub = onSnapshot(doc(db, 'qr_bridges', bridgeId), (snap) => {
-            if (!snap.exists()) return;
-            const data = snap.data();
-
-            if (data.status === 'scanned') {
-                status.innerText = "Handshake detected. Please approve.";
-                approvalBox.classList.remove('hidden');
-                document.getElementById('qr-request-device').innerText = data.deviceInfo || 'Mobile Device';
-
-                const passVerifyBox = document.getElementById('qr-pass-verify-box');
-                const sessionPass = sessionStorage.getItem('dialer_bridge_pass');
-
-                if (!sessionPass) {
-                    passVerifyBox.classList.remove('hidden');
-                } else {
-                    passVerifyBox.classList.add('hidden');
-                }
-
-                document.getElementById('btn-qr-approve').onclick = async () => {
-                    let pass = sessionStorage.getItem('dialer_bridge_pass');
-                    if (!pass) {
-                        pass = document.getElementById('qr-pass-verify').value;
-                    }
-
-                    if (!pass) {
-                        showToast('Please enter your password to confirm.', 'error');
-                        return;
-                    }
-
-                    status.innerText = "Transferring credentials...";
-                    await updateDoc(doc(db, 'qr_bridges', bridgeId), {
-                        status: 'approved',
-                        email: auth.currentUser.email,
-                        password: pass,
-                        approvedAt: serverTimestamp()
-                    });
-
-                    // Save password for subsequent uses in this tab
-                    sessionStorage.setItem('dialer_bridge_pass', pass);
-
-                    showToast('Login approved!');
-                    setTimeout(() => closeModal('modal-dialer-qr'), 2000);
-                };
-
-                document.getElementById('btn-qr-deny').onclick = () => {
-                    cleanupDialerBridge(bridgeId);
-                    closeModal('modal-dialer-qr');
-                };
-            } else if (data.status === 'completed') {
-                status.innerText = "Login successful!";
-                setTimeout(() => closeModal('modal-dialer-qr'), 2000);
-            }
-        });
-
-    } catch (error) {
-        console.error('QR Bridge Error:', error);
-        status.innerText = "Failed: " + (error.message || "Unknown error");
-        if (typeof QRCode === 'undefined') {
-            status.innerText = "Error: QRCode library not loaded.";
-        }
-    }
-};
-
-window.cleanupDialerBridge = async (bridgeId) => {
-    if (qrBridgeUnsub) qrBridgeUnsub();
-    if (qrBridgeTimer) clearInterval(qrBridgeTimer);
-    try {
-        await deleteDoc(doc(db, 'qr_bridges', bridgeId));
-    } catch (e) { }
-};

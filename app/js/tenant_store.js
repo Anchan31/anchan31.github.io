@@ -16,9 +16,7 @@ export const TENANT_COLLECTIONS = Object.freeze({
     masters_designations: "masters_designations",
     masters_industries: "masters_industries",
     masters_sources: "masters_sources",
-    presence: "presence",
-    qr_bridges: "qr_bridges",
-    remote_calls: "remote_calls"
+    presence: "presence"
 });
 
 let resolveProfile = () => null;
