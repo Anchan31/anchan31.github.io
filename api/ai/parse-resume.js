@@ -19,7 +19,11 @@ async function extractTextFromResume({ resumeText, resumeUrl }) {
   const lowerUrl = resumeUrl.toLowerCase().split('?')[0];
 
   if (contentType.includes('pdf') || lowerUrl.endsWith('.pdf')) {
-    const pdfParse = require('pdf-parse');
+    const pdfLib = require('pdf-parse');
+    const pdfParse = typeof pdfLib === 'function' ? pdfLib : (pdfLib.PDFParse || pdfLib.default);
+    if (typeof pdfParse !== 'function') {
+      throw new Error('PDF parsing library could not be resolved as a function.');
+    }
     const parsed = await pdfParse(buffer);
     return String(parsed.text || '').slice(0, 25000);
   }
