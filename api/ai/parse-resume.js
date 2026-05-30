@@ -19,14 +19,9 @@ async function extractTextFromResume({ resumeText, resumeUrl }) {
   const lowerUrl = resumeUrl.toLowerCase().split('?')[0];
 
   if (contentType.includes('pdf') || lowerUrl.endsWith('.pdf')) {
-    const { PDFParse } = require('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
-    try {
-      const result = await parser.getText();
-      return String(result.text || '').slice(0, 25000);
-    } finally {
-      await parser.destroy();
-    }
+    const pdfParse = require('pdf-parse');
+    const parsed = await pdfParse(buffer);
+    return String(parsed.text || '').slice(0, 25000);
   }
 
   if (contentType.includes('word') || lowerUrl.endsWith('.docx')) {
