@@ -5293,13 +5293,13 @@
           const wrap = document.createElement("div");
           wrap.id = tempMsgId;
           wrap.style.cssText = "display:flex;align-items:flex-end;gap:10px;animation:fadeIn 0.25s ease;";
-          wrap.innerHTML = \`
+          wrap.innerHTML = `
             <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                 <i class="fas fa-robot" style="font-size:12px;color:#3b82f6;"></i>
             </div>
             <div style="max-width:78%;background:#f8fafc;border:1px solid #f1f5f9;border-radius:18px;border-bottom-left-radius:4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
                 <span class="text-slate-400"><i class='fas fa-ellipsis fa-fade'></i></span>
-            </div>\`;
+            </div>`;
           chatHistory.appendChild(wrap);
           scrollToBottom();
           chatInput.disabled = true;
@@ -5314,7 +5314,7 @@
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': \`Bearer \${token}\` } : {})
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
               },
               body: JSON.stringify({
                 message: text,
