@@ -1,3 +1,7 @@
+if (typeof global.DOMMatrix === 'undefined') {
+  global.DOMMatrix = class DOMMatrix {};
+}
+
 const {
   admin,
   callHuggingFaceJson,
