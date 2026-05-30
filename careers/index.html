@@ -2275,34 +2275,38 @@
       "
     ></div>
 
-    <!-- Naukri-Style AI Chat Panel -->
+    <!-- Naukri-Style AI Chat Panel (Modernized) -->
     <div
       id="ai-chat-widget"
       style="
         position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
+        bottom: 110px;
+        right: 24px;
         z-index: 60;
         display: flex;
         flex-direction: column;
-        width: 100%;
-        max-width: 420px;
-        transform: translateX(100%);
-        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        width: calc(100vw - 48px);
+        max-width: 400px;
+        height: min(650px, calc(100vh - 140px));
+        transform: translateY(20px) scale(0.95);
+        opacity: 0;
+        transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         pointer-events: none;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255,255,255,0.2);
+        backdrop-filter: blur(16px);
+        background: rgba(255, 255, 255, 0.85);
       "
+      class="dark:bg-slate-900/85"
     >
       <div
         style="
           display: flex;
           flex-direction: column;
           height: 100%;
-          background: #fff;
-          box-shadow: -8px 0 40px rgba(0, 0, 0, 0.15);
           pointer-events: auto;
         "
-        class="dark:bg-slate-900"
       >
         <!-- Panel Header -->
         <div
@@ -2310,8 +2314,9 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 18px 20px;
-            border-bottom: 1px solid #f1f5f9;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(16,185,129,0.1));
+            border-bottom: 1px solid rgba(255,255,255,0.3);
             flex-shrink: 0;
           "
           class="dark:border-slate-700/60"
@@ -2422,10 +2427,11 @@
             left: 0;
             right: 0;
             padding: 12px 16px 16px;
-            background: #fff;
-            border-top: 1px solid #f1f5f9;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid rgba(0,0,0,0.05);
           "
-          class="dark:bg-slate-900 dark:border-slate-700/60"
+          class="dark:bg-slate-900/80 dark:border-slate-700/60"
         >
           <!-- Option Chips (shown contextually) -->
           <div
@@ -2446,14 +2452,14 @@
               type="text"
               id="ai-chat-input"
               style="
-                flex: 1;
-                border: 1.5px solid #e2e8f0;
-                border-radius: 12px;
-                padding: 10px 16px;
-                font-size: 14px;
+                border: 1px solid rgba(0,0,0,0.1);
+                border-radius: 20px;
+                padding: 12px 16px;
+                font-size: 14.5px;
                 outline: none;
-                background: #f8fafc;
+                background: rgba(255,255,255,0.9);
                 color: #0f172a;
+                box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
                 transition: all 0.2s;
               "
               placeholder="Type message here..."
@@ -2471,18 +2477,18 @@
             <button
               type="submit"
               style="
-                width: 40px;
-                height: 40px;
-                border-radius: 12px;
+                width: 44px;
+                height: 44px;
+                border-radius: 50%;
                 border: none;
-                background: linear-gradient(135deg, #3b82f6, #6366f1);
+                background: linear-gradient(135deg, #3b82f6, #10b981);
                 color: #fff;
                 cursor: pointer;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 flex-shrink: 0;
-                box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
                 transition: all 0.2s;
               "
               onmouseenter="this.style.transform = 'scale(1.05)'"
@@ -2501,31 +2507,39 @@
       id="ai-chat-toggle"
       style="
         position: fixed;
-        bottom: 96px;
-        right: 24px;
+        bottom: 32px;
+        right: 32px;
         z-index: 58;
-        width: 56px;
-        height: 56px;
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         border: none;
-        background: linear-gradient(135deg, #3b82f6, #6366f1);
+        background: linear-gradient(135deg, #3b82f6, #10b981);
         color: #fff;
         cursor: pointer;
-        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.45);
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.45);
         transition: all 0.25s;
         display: flex;
         align-items: center;
         justify-content: center;
+        animation: pulse-ring 2s infinite;
       "
       onmouseenter="
-        this.style.transform = 'translateY(-3px)';
-        this.style.boxShadow = '0 12px 28px rgba(59,130,246,0.55)';
+        this.style.transform = 'translateY(-4px) scale(1.05)';
+        this.style.boxShadow = '0 12px 28px rgba(16,185,129,0.6)';
       "
       onmouseleave="
-        this.style.transform = 'translateY(0)';
-        this.style.boxShadow = '0 8px 24px rgba(59,130,246,0.45)';
+        this.style.transform = 'translateY(0) scale(1)';
+        this.style.boxShadow = '0 8px 24px rgba(16,185,129,0.45)';
       "
     >
+      <style>
+        @keyframes pulse-ring {
+          0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+          70% { box-shadow: 0 0 0 15px rgba(16,185,129,0); }
+          100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+        }
+      </style>
       <i
         id="ai-chat-icon-robot"
         class="fas fa-robot"
@@ -5025,21 +5039,22 @@
         const iconRobot = document.getElementById("ai-chat-icon-robot");
         const iconClose = document.getElementById("ai-chat-icon-close");
         const isClosed =
-          panel.style.transform === "translateX(100%)" ||
+          panel.style.transform.includes("translateY(20px)") ||
           panel.style.transform === "";
 
         if (isClosed) {
-          panel.style.transform = "translateX(0)";
+          panel.style.transform = "translateY(0) scale(1)";
+          panel.style.opacity = "1";
           panel.style.pointerEvents = "auto";
           backdrop.style.opacity = "1";
           backdrop.style.pointerEvents = "auto";
           if (iconRobot) {
             iconRobot.style.opacity = "0";
-            iconRobot.style.transform = "scale(0.5)";
+            iconRobot.style.transform = "scale(0.5) rotate(-45deg)";
           }
           if (iconClose) {
             iconClose.style.opacity = "1";
-            iconClose.style.transform = "scale(1)";
+            iconClose.style.transform = "scale(1) rotate(0)";
           }
 
           if (!hasOpenedChat) {
@@ -5061,17 +5076,18 @@
           }
           setTimeout(() => chatInput.focus(), 300);
         } else {
-          panel.style.transform = "translateX(100%)";
+          panel.style.transform = "translateY(20px) scale(0.95)";
+          panel.style.opacity = "0";
           panel.style.pointerEvents = "none";
           backdrop.style.opacity = "0";
           backdrop.style.pointerEvents = "none";
           if (iconRobot) {
             iconRobot.style.opacity = "1";
-            iconRobot.style.transform = "scale(1)";
+            iconRobot.style.transform = "scale(1) rotate(0)";
           }
           if (iconClose) {
             iconClose.style.opacity = "0";
-            iconClose.style.transform = "scale(0.5)";
+            iconClose.style.transform = "scale(0.5) rotate(45deg)";
           }
         }
       };
@@ -5117,11 +5133,11 @@
         wrap.style.cssText =
           "display:flex;align-items:flex-end;gap:10px;animation:fadeIn 0.25s ease;";
         wrap.innerHTML = `
-                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <i class="fas fa-robot" style="font-size:12px;color:#3b82f6;"></i>
+                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#d1fae5);border:1px solid #a7f3d0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-robot" style="font-size:12px;color:#10b981;"></i>
                 </div>
-                <div style="max-width:78%;background:#f8fafc;border:1px solid #f1f5f9;border-radius:18px;border-bottom-left-radius:4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
-                    <p style="font-size:13.5px;color:#334155;line-height:1.55;margin:0;">${msg}</p>
+                <div style="max-width:78%;background:rgba(255,255,255,0.95);border:1px solid rgba(0,0,0,0.05);border-radius:20px;border-bottom-left-radius:4px;padding:12px 16px;box-shadow:0 4px 12px rgba(0,0,0,0.03);">
+                    <p style="font-size:14px;color:#334155;line-height:1.6;margin:0;">${msg}</p>
                 </div>`;
         chatHistory.appendChild(wrap);
         scrollToBottom();
@@ -5131,13 +5147,13 @@
         const html = `
                 <div class="flex items-end gap-2 w-full animate-fade-in pr-3 mt-1 mb-2">
                     <div class="w-8 h-8 rounded-full bg-transparent flex-shrink-0"></div>
-                    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 p-4 rounded-3xl rounded-bl-sm border border-emerald-200 dark:border-emerald-800/50 shadow-sm w-full cursor-pointer hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all group relative overflow-hidden" onclick="window.viewJobDetails('${job.id}')">
+                    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 p-5 rounded-[24px] rounded-bl-md border border-emerald-200 dark:border-emerald-800/50 shadow-sm w-full cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all group relative overflow-hidden" onclick="window.viewJobDetails('${job.id}')">
                         <div class="absolute -top-4 -right-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
                         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 mb-2.5 border border-emerald-200 dark:border-emerald-800/50 shadow-sm"><i class="fas fa-bolt text-[8px] text-yellow-500"></i> AI Match</span>
-                        <h4 class="text-[15px] font-black text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors leading-tight drop-shadow-sm mb-1">${job.title}</h4>
-                        <p class="text-[11px] font-bold text-slate-500 flex items-center gap-1 mb-1"><i class="fas fa-building text-slate-400"></i> ${job.department || "General"}</p>
-                        <p class="text-[11px] font-bold text-slate-500 flex items-center gap-1"><i class="fas fa-location-dot text-slate-400"></i> ${job.location || "Remote"}</p>
-                        <button class="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-emerald-500/20 pointer-events-auto flex items-center justify-center gap-2 transition-all group-hover:scale-[1.02]">Open Role <i class="fas fa-arrow-right text-[10px]"></i></button>
+                        <h4 class="text-[16px] font-black text-slate-800 dark:text-white group-hover:text-blue-600 transition-colors leading-tight drop-shadow-sm mb-1.5">${job.title}</h4>
+                        <p class="text-[12px] font-bold text-slate-500 flex items-center gap-1 mb-1"><i class="fas fa-building text-slate-400"></i> ${job.department || "General"}</p>
+                        <p class="text-[12px] font-bold text-slate-500 flex items-center gap-1"><i class="fas fa-location-dot text-slate-400"></i> ${job.location || "Remote"}</p>
+                        <button class="mt-4 w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-[13px] shadow-lg shadow-emerald-500/25 pointer-events-auto flex items-center justify-center gap-2 transition-all group-hover:scale-[1.02]">Open Role <i class="fas fa-arrow-right text-[10px]"></i></button>
                     </div>
                 </div>
             `;
@@ -5150,8 +5166,8 @@
         wrap.style.cssText =
           "display:flex;justify-content:flex-end;animation:fadeIn 0.2s ease;";
         wrap.innerHTML = `
-                <div style="max-width:78%;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:18px;border-bottom-right-radius:4px;padding:10px 14px;box-shadow:0 2px 8px rgba(59,130,246,0.3);">
-                    <p style="font-size:13.5px;color:#fff;line-height:1.55;margin:0;font-weight:500;">${msg}</p>
+                <div style="max-width:78%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:20px;border-bottom-right-radius:4px;padding:12px 16px;box-shadow:0 4px 12px rgba(59,130,246,0.35);">
+                    <p style="font-size:14px;color:#fff;line-height:1.6;margin:0;font-weight:500;">${msg}</p>
                 </div>`;
         chatHistory.appendChild(wrap);
         scrollToBottom();
