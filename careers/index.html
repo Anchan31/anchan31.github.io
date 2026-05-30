@@ -2223,7 +2223,12 @@
                     })
                 });
                 const payload = await response.json();
-                if (!response.ok) throw new Error(payload.error || 'Resume parsing failed.');
+                if (!response.ok) {
+                    if (response.status === 402) {
+                        throw new Error('No AI credits remaining. Ask your workspace admin to add credits in the Access Portal.');
+                    }
+                    throw new Error(payload.error || 'Resume parsing failed.');
+                }
 
                 applyResumeSuggestions(payload.parsed || {});
                 alert("AI suggestions were added to the form. Please review every field before submitting.");

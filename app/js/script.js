@@ -1168,8 +1168,13 @@ function setupRealtimeListeners() {
     };
 
     const logSource = (collectionName, snapshot) => {
-        const source = snapshot.metadata.fromCache ? "local cache" : "server";
-        console.log(`[Firestore] ${collectionName} loaded from ${source} (${snapshot.size} docs)`);
+        const source = snapshot?.metadata?.fromCache ? "local cache" : "server";
+        const size = typeof snapshot?.size === "number"
+            ? snapshot.size
+            : typeof snapshot?.exists === "function"
+                ? (snapshot.exists() ? 1 : 0)
+                : 0;
+        console.log(`[Firestore] ${collectionName} loaded from ${source} (${size} docs)`);
     };
 
     const bump = () => {
@@ -1189,7 +1194,7 @@ function setupRealtimeListeners() {
     };
 
     onSnapshot(doc(db, "companies", cid), (companySnap) => {
-        logSource("Companies(doc)", { size: companySnap.exists() ? 1 : 0 });
+        logSource("Companies(doc)", companySnap);
         if (companySnap.exists()) {
             applyCompanySnapshot(companySnap);
         } else {
@@ -7013,7 +7018,12 @@ window.generateInterviewQuestions = async (candidateId) => {
             })
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || 'Question generation failed.');
+        if (!response.ok) {
+            if (response.status === 402) {
+                throw new Error('No AI credits remaining. Add credits in the Access Portal company record, then try again.');
+            }
+            throw new Error(payload.error || 'Question generation failed.');
+        }
 
         const questions = payload.generated?.questions || [];
         const preview = questions.map((q, index) => `${index + 1}. ${q.question || q}`).join('\n\n');
