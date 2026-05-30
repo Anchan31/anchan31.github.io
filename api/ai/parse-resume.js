@@ -1,8 +1,5 @@
 const {
-  getAuthedContext,
-  reserveAiCredit,
-  completeAiCredit,
-  refundAiCredit,
+  admin,
   callHuggingFaceJson,
   sendError
 } = require('../../lib/aiAuth');
@@ -35,11 +32,15 @@ async function extractTextFromResume({ resumeText, resumeUrl }) {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let ctx;
-  let ledgerId;
   try {
-    ctx = await getAuthedContext(req, 'careers');
-    ledgerId = await reserveAiCredit(ctx.company.id, ctx.user.id, 'resume_parse', 1);
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!token) {
+      return res.status(401).json({ error: 'Missing Firebase ID token.' });
+    }
+    
+    // Verify Firebase token directly to authenticate candidate
+    await admin.auth().verifyIdToken(token);
 
     const resumeText = await extractTextFromResume(req.body || {});
     const model = process.env.HF_RESUME_MODEL || process.env.HF_CHAT_MODEL || 'meta-llama/Llama-3.1-8B-Instruct';
@@ -54,12 +55,8 @@ module.exports = async (req, res) => {
       ]
     });
 
-    await completeAiCredit(ledgerId, 'succeeded', { action: 'resume_parse' });
-    res.status(200).json({ success: true, creditsUsed: 1, parsed });
+    res.status(200).json({ success: true, creditsUsed: 0, parsed });
   } catch (error) {
-    if (ctx && ledgerId) {
-      await refundAiCredit(ctx.company.id, ledgerId, 1, error.message).catch(() => {});
-    }
     sendError(res, error);
   }
 };
