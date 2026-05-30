@@ -4404,8 +4404,7 @@
         const incompleteProfile =
           isLoggedIn &&
           (!currentProfile ||
-            !currentProfile.resumeUrl ||
-            !currentProfile.aadhaarUrl);
+            !currentProfile.resumeUrl);
 
         let applyBtnHtml = "";
 
@@ -4490,8 +4489,7 @@
             const incompleteProfile =
               isLoggedIn &&
               (!currentProfile ||
-                !currentProfile.resumeUrl ||
-                !currentProfile.aadhaarUrl);
+                !currentProfile.resumeUrl);
 
             let btnHtml = "";
             if (applied) {
@@ -5180,7 +5178,9 @@
         processChatInput(text);
       };
 
-      const processChatInput = (text) => {
+      // ---- CONVERSATIONAL INTENTS (AI Powered) ----
+      let aiMessageContext = [];
+      const processChatInput = async (text) => {
         const lower = text.toLowerCase();
 
         // ---- CHIP / ACTION COMMANDS (handled first, always) ----
@@ -5285,40 +5285,66 @@
           return;
         }
 
-        // ---- CONVERSATIONAL INTENTS ----
-        if (
-          lower.includes("thank") ||
-          lower.includes("awesome") ||
-          lower.includes("great") ||
-          lower.includes("cool")
-        ) {
-          chatState = 3;
-          setTimeout(() => {
-            addBotMessage("You're welcome! Happy to help anytime. 😊");
-            addBotOptions(["Search New Role", "My Applications", "Close Chat"]);
-          }, 600);
-          return;
-        }
-
-        if (
-          (lower.includes("hi") ||
-            lower.includes("hello") ||
-            lower.includes("hey")) &&
-          chatState !== 1
-        ) {
-          setTimeout(() => {
-            addBotMessage(
-              "Hello there! 👋 How can I help you in your career journey today?",
-            );
-            addBotOptions(["Find a Job", "How it works?", "Contact Support"]);
-          }, 600);
-          return;
-        }
-
         // ---- MAIN SEARCH FLOW ----
-        if (chatState === 3) {
-          chatState = 0;
-          chatData = { role: "", location: "" };
+        // If we are currently not in the middle of a search flow, let's process it with AI
+        if (chatState === 3 || chatState === -1 || (chatState !== 0 && chatState !== 1)) {
+          // Temporarily show typing indicator
+          const tempMsgId = 'typing-' + Date.now();
+          const wrap = document.createElement("div");
+          wrap.id = tempMsgId;
+          wrap.style.cssText = "display:flex;align-items:flex-end;gap:10px;animation:fadeIn 0.25s ease;";
+          wrap.innerHTML = \`
+            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-robot" style="font-size:12px;color:#3b82f6;"></i>
+            </div>
+            <div style="max-width:78%;background:#f8fafc;border:1px solid #f1f5f9;border-radius:18px;border-bottom-left-radius:4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+                <span class="text-slate-400"><i class='fas fa-ellipsis fa-fade'></i></span>
+            </div>\`;
+          chatHistory.appendChild(wrap);
+          scrollToBottom();
+          chatInput.disabled = true;
+
+          try {
+            let token = "";
+            if (currentUser) {
+              token = await currentUser.getIdToken();
+            }
+            
+            const response = await fetch('/api/ai/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': \`Bearer \${token}\` } : {})
+              },
+              body: JSON.stringify({
+                message: text,
+                history: aiMessageContext,
+                companyId: getCompanyId()
+              })
+            });
+            
+            const data = await response.json();
+            document.getElementById(tempMsgId)?.remove();
+            
+            if (data.success) {
+              addBotMessage(data.response);
+              // Save context
+              aiMessageContext.push({ role: 'user', content: text });
+              aiMessageContext.push({ role: 'assistant', content: data.response });
+            } else {
+              addBotMessage("Sorry, I'm having trouble thinking right now. Please try again later.");
+            }
+          } catch (err) {
+            console.error("AI Chat Error:", err);
+            document.getElementById(tempMsgId)?.remove();
+            addBotMessage("I couldn't reach the server. Let's stick to the basics. Want to find a job?");
+            addBotOptions(["Find a Job", "Close Chat"]);
+          } finally {
+            chatInput.disabled = false;
+            chatInput.focus();
+            chatState = 3; 
+          }
+          return;
         }
 
         setTimeout(() => {
