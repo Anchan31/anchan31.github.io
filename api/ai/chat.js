@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
       
       const jobsList = jobsSnap.docs.map(doc => {
         const data = doc.data();
-        return `- ${data.title} (${data.department || 'General'}, ${data.location || 'Remote'})`;
+        return `- Job ID: ${doc.id} | Title: ${data.title} | Dept: ${data.department || 'General'} | Loc: ${data.location || 'Remote'}`;
       }).join('\n');
       
       if (jobsList) {
@@ -49,10 +49,10 @@ module.exports = async (req, res) => {
         role: 'system',
         content: `You are a helpful AI recruiting assistant for a career portal. 
 Your goal is to help candidates find suitable roles and answer their questions about the company.
-Keep your answers brief, friendly, and professional (under 3-4 sentences max). 
+Keep your conversational answers brief, friendly, and professional (under 3-4 sentences max). 
 Do NOT make up information. Use only the provided context.
-If they ask about open roles, mention the available ones.
-You must reply in strict JSON format with a single key "message". Example: {"message": "Hello! I can help you find a job."}${jobsContext}`
+If the candidate asks about open roles, or if you find a good match based on their request, you must include the matching Job IDs in the "suggestedJobIds" array.
+You must reply in strict JSON format with exactly two keys: "message" (string) and "suggestedJobIds" (array of strings). Example: {"message": "Here are some remote developer roles for you!", "suggestedJobIds": ["12345", "67890"]}${jobsContext}`
       },
       // Keep only last 5 messages for context length
       ...history.slice(-5),
@@ -65,7 +65,11 @@ You must reply in strict JSON format with a single key "message". Example: {"mes
       temperature: 0.6
     });
 
-    res.status(200).json({ success: true, response: parsed.message || "I'm sorry, I couldn't understand that." });
+    res.status(200).json({ 
+      success: true, 
+      response: parsed.message || "I'm sorry, I couldn't understand that.",
+      suggestedJobIds: Array.isArray(parsed.suggestedJobIds) ? parsed.suggestedJobIds : []
+    });
   } catch (error) {
     sendError(res, error);
   }

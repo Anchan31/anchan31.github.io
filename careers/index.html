@@ -5016,8 +5016,7 @@
       const chatHistory = document.getElementById("ai-chat-history");
       const chatInput = document.getElementById("ai-chat-input");
 
-      let chatState = 0;
-      let chatData = { role: "", location: "" };
+
       let hasOpenedChat = false;
 
       window.toggleChatbot = () => {
@@ -5049,14 +5048,13 @@
               addBotMessage("Hi! I'm your AI Career Assistant. ✨");
               setTimeout(() => {
                 addBotMessage(
-                  "I can help you find the right role. What kind of position are you looking for?",
+                  "I can help you find the right role, answer questions about our company, or assist with your application. How can I help you today?",
                 );
                 addBotOptions([
-                  "Developer",
-                  "Operations",
-                  "Sales",
-                  "HR",
-                  "Browse All",
+                  "Find a Job",
+                  "My Applications",
+                  "How it works?",
+                  "Contact Support"
                 ]);
               }, 800);
             }, 400);
@@ -5286,206 +5284,81 @@
         }
 
         // ---- MAIN SEARCH FLOW ----
-        // If we are currently not in the middle of a search flow, let's process it with AI
-        if (chatState === 3 || chatState === -1 || (chatState !== 0 && chatState !== 1)) {
-          // Temporarily show typing indicator
-          const tempMsgId = 'typing-' + Date.now();
-          const wrap = document.createElement("div");
-          wrap.id = tempMsgId;
-          wrap.style.cssText = "display:flex;align-items:flex-end;gap:10px;animation:fadeIn 0.25s ease;";
-          wrap.innerHTML = `
-            <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                <i class="fas fa-robot" style="font-size:12px;color:#3b82f6;"></i>
-            </div>
-            <div style="max-width:78%;background:#f8fafc;border:1px solid #f1f5f9;border-radius:18px;border-bottom-left-radius:4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
-                <span class="text-slate-400"><i class='fas fa-ellipsis fa-fade'></i></span>
-            </div>`;
-          chatHistory.appendChild(wrap);
-          scrollToBottom();
-          chatInput.disabled = true;
-
-          try {
-            let token = "";
-            if (currentUser) {
-              token = await currentUser.getIdToken();
-            }
-            
-            const response = await fetch('/api/ai/chat', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-              },
-              body: JSON.stringify({
-                message: text,
-                history: aiMessageContext,
-                companyId: getCompanyId()
-              })
-            });
-            
-            const data = await response.json();
-            document.getElementById(tempMsgId)?.remove();
-            
-            if (data.success) {
-              addBotMessage(data.response);
-              // Save context
-              aiMessageContext.push({ role: 'user', content: text });
-              aiMessageContext.push({ role: 'assistant', content: data.response });
-            } else {
-              addBotMessage("Sorry, I'm having trouble thinking right now. Please try again later.");
-            }
-          } catch (err) {
-            console.error("AI Chat Error:", err);
-            document.getElementById(tempMsgId)?.remove();
-            addBotMessage("I couldn't reach the server. Let's stick to the basics. Want to find a job?");
-            addBotOptions(["Find a Job", "Close Chat"]);
-          } finally {
-            chatInput.disabled = false;
-            chatInput.focus();
-            chatState = 3; 
-          }
-          return;
-        }
-
-        setTimeout(() => {
-          if (chatState === 0) {
-            chatData.role = lower;
-
-            const commonLocs = [
-              "remote",
-              "mumbai",
-              "delhi",
-              "bangalore",
-              "pune",
-              "hyderabad",
-              "chennai",
-              "gujarat",
-              "halol",
-              "anywhere",
-            ];
-            const foundLoc = commonLocs.find((l) => lower.includes(l));
-
-            if (lower === "any") {
-              chatData.role = "any";
-              chatData.location = "any";
-              processMatching();
-            } else if (foundLoc) {
-              chatData.location = foundLoc === "anywhere" ? "any" : foundLoc;
-              processMatching();
-            } else {
-              chatState = 1;
-              addBotMessage(
-                `Got it — looking for <strong>${text}</strong> roles. 📍 Where would you like to work?`,
-              );
-              addBotOptions(["Remote", "Halol, Gujrat", "Mumbai", "Anywhere"]);
-            }
-          } else if (chatState === 1) {
-            chatData.location = lower.includes("anywhere") ? "any" : lower;
-            processMatching();
-          }
-        }, 600);
-      };
-
-      const processMatching = () => {
-        chatState = 2; // finished
+        // Send everything else to the AI
+        
+        // Temporarily show typing indicator
+        const tempMsgId = 'typing-' + Date.now();
+        const wrap = document.createElement("div");
+        wrap.id = tempMsgId;
+        wrap.style.cssText = "display:flex;align-items:flex-end;gap:10px;animation:fadeIn 0.25s ease;";
+        wrap.innerHTML = `
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i class="fas fa-robot" style="font-size:12px;color:#3b82f6;"></i>
+          </div>
+          <div style="max-width:78%;background:#f8fafc;border:1px solid #f1f5f9;border-radius:18px;border-bottom-left-radius:4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+              <span class="text-slate-400"><i class='fas fa-ellipsis fa-fade'></i></span>
+          </div>`;
+        chatHistory.appendChild(wrap);
+        scrollToBottom();
         chatInput.disabled = true;
-        addBotMessage(
-          "<span class='text-slate-400 font-medium'>Scanning available jobs... <i class='fas fa-circle-notch fa-spin text-blue-500 ml-1'></i></span>",
-        );
 
-        setTimeout(() => {
-          chatHistory.lastElementChild.remove(); // remove processing message
-
-          const matches = openJobs.filter((job) => {
-            const cleanTitle = (job.title || "").toLowerCase();
-            const cleanDept = (job.department || "").toLowerCase();
-            const cleanSkills = (
-              (job.skills || "") +
-              "," +
-              (job.keySkills || "")
-            ).toLowerCase();
-            const cleanLoc = (job.location || "").toLowerCase();
-
-            const roleKeywords = chatData.role
-              .split(" ")
-              .filter((k) => k.length > 2);
-            let titleMatch =
-              roleKeywords.length > 0
-                ? roleKeywords.some(
-                    (k) =>
-                      cleanTitle.includes(k) ||
-                      cleanDept.includes(k) ||
-                      cleanSkills.includes(k),
-                  )
-                : true;
-
-            if (!titleMatch && chatData.role.length <= 3) {
-              titleMatch =
-                cleanTitle.includes(chatData.role) ||
-                cleanDept.includes(chatData.role);
-            }
-            if (chatData.role === "any") titleMatch = true;
-
-            const isAnyLoc =
-              chatData.location.includes("any") ||
-              chatData.location.includes("open") ||
-              chatData.location.includes("where");
-            const locMatch = isAnyLoc || cleanLoc.includes(chatData.location);
-
-            return titleMatch && locMatch;
-          });
-
-          if (matches.length > 0) {
-            const bestMatch = matches[0];
-            if (matches.length === 1) {
-              addBotMessage("I found a perfect match for you! 🎯");
-            } else {
-              addBotMessage(
-                `I found <strong>${matches.length} relevant positions</strong> for you. Here's the best match:`,
-              );
-            }
-
-            setTimeout(() => {
-              addBotJobCard(bestMatch);
-              chatState = 3;
-              chatInput.disabled = false;
-              chatInput.placeholder = "Ask me anything else...";
-
-              // If multiple matches, give an option to see all
-              if (matches.length > 1) {
-                setTimeout(() => {
-                  addBotMessage(
-                    "Would you like to see all results in the main portal?",
-                  );
-                  addBotOptions(["Show All Results", "Search Again"]);
-                }, 1000);
-              }
-
-              setTimeout(() => {
-                if (!chatWindow.classList.contains("scale-0")) {
-                  window.viewJobDetails(bestMatch.id);
-                }
-              }, 1500);
-            }, 600);
-          } else {
-            addBotMessage(
-              "<strong>Hmm, I couldn't find a role matching that criteria right now.</strong> 🔍",
-            );
-            setTimeout(() => {
-              addBotMessage(
-                "Don't worry — new roles open up frequently! Here's what you can do:",
-              );
-              addBotOptions([
-                "Browse Departments",
-                "Try Different Search",
-                "Show All Jobs",
-              ]);
-              chatState = 3;
-              chatInput.disabled = false;
-              chatInput.placeholder = "Try a different role...";
-            }, 800);
+        try {
+          let token = "";
+          if (currentUser) {
+            token = await currentUser.getIdToken();
           }
-        }, 1200);
+          
+          const response = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              message: text,
+              history: aiMessageContext,
+              companyId: getCompanyId()
+            })
+          });
+          
+          const data = await response.json();
+          document.getElementById(tempMsgId)?.remove();
+          
+          if (data.success) {
+            addBotMessage(data.response);
+            
+            // If the AI recommended jobs, render them
+            if (data.suggestedJobIds && data.suggestedJobIds.length > 0) {
+              const matchedJobs = data.suggestedJobIds.map(id => openJobs.find(j => j.id === id)).filter(Boolean);
+              
+              if (matchedJobs.length > 0) {
+                setTimeout(() => {
+                  matchedJobs.forEach(job => addBotJobCard(job));
+                  if (matchedJobs.length > 1) {
+                    setTimeout(() => {
+                      addBotMessage("Would you like to see all results in the main portal?");
+                      addBotOptions(["Show All Jobs", "Contact Support"]);
+                    }, 500 * matchedJobs.length);
+                  }
+                }, 600);
+              }
+            }
+            
+            // Save context
+            aiMessageContext.push({ role: 'user', content: text });
+            aiMessageContext.push({ role: 'assistant', content: data.response });
+          } else {
+            addBotMessage("Sorry, I'm having trouble thinking right now. Please try again later.");
+          }
+        } catch (err) {
+          console.error("AI Chat Error:", err);
+          document.getElementById(tempMsgId)?.remove();
+          addBotMessage("I couldn't reach the server. Let's stick to the basics. Want to find a job?");
+          addBotOptions(["Find a Job", "Close Chat"]);
+        } finally {
+          chatInput.disabled = false;
+          chatInput.focus();
+        }
       };
     </script>
   </body>
