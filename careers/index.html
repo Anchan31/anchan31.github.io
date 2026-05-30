@@ -2705,8 +2705,6 @@
       let uploadedResumeUrl = "";
       let uploadedAadhaarUrl = "";
       let activeFilters = { search: "", dept: "", location: "" };
-      let selectedSkills = [];
-      let allSkillSuggestions = [];
 
       // Cloudinary config
       const CLOUDINARY_URL =
@@ -3203,102 +3201,6 @@
       };
 
 
-      // --- SKILL PILLS SYSTEM ---
-      const skillsContainer = document.getElementById('skills-container');
-      const skillsInput = document.getElementById('prof-skills-input');
-      const skillsHidden = document.getElementById('prof-skills-hidden');
-      const skillsSuggestions = document.getElementById('skills-suggestions');
-
-      function addSkillPill(skill) {
-        if (!skill) return;
-        const trimmed = String(skill).trim();
-        if (!trimmed) return;
-        // Avoid duplicates (case-insensitive)
-        if (selectedSkills.some(s => s.toLowerCase() === trimmed.toLowerCase())) return;
-        selectedSkills.push(trimmed);
-        renderSkills();
-      }
-
-      function removeSkillPill(skill) {
-        selectedSkills = selectedSkills.filter(s => s.toLowerCase() !== skill.toLowerCase());
-        renderSkills();
-      }
-
-      function renderSkills() {
-        if (!skillsContainer) return;
-        // Remove existing pills (keep the input element)
-        skillsContainer.querySelectorAll('.skill-pill').forEach(el => el.remove());
-        selectedSkills.forEach(skill => {
-          const pill = document.createElement('span');
-          pill.className = 'skill-pill inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 cursor-default animate-fade-in';
-          pill.innerHTML = `${skill}<button type="button" class="ml-0.5 hover:text-red-500 transition-colors" onclick="removeSkillPill('${skill.replace(/'/g, "\\'")}')"><i class="fas fa-times text-[9px]"></i></button>`;
-          skillsContainer.insertBefore(pill, skillsInput);
-        });
-        // Update hidden field
-        if (skillsHidden) skillsHidden.value = selectedSkills.join(', ');
-      }
-
-      window.removeSkillPill = removeSkillPill;
-
-      window.mergeDynamicSkills = function(newSkills) {
-        if (!Array.isArray(newSkills)) return;
-        newSkills.forEach(s => {
-          const trimmed = String(s).trim();
-          if (trimmed && !allSkillSuggestions.some(x => x.toLowerCase() === trimmed.toLowerCase())) {
-            allSkillSuggestions.push(trimmed);
-          }
-        });
-      };
-
-      // Skills input autocomplete
-      if (skillsInput && skillsSuggestions) {
-        skillsInput.addEventListener('input', () => {
-          const val = skillsInput.value.trim().toLowerCase();
-          if (!val) {
-            skillsSuggestions.classList.add('hidden');
-            skillsSuggestions.style.opacity = '0';
-            return;
-          }
-          const matches = allSkillSuggestions
-            .filter(s => s.toLowerCase().includes(val) && !selectedSkills.some(sel => sel.toLowerCase() === s.toLowerCase()))
-            .slice(0, 8);
-          if (matches.length === 0) {
-            skillsSuggestions.classList.add('hidden');
-            skillsSuggestions.style.opacity = '0';
-            return;
-          }
-          skillsSuggestions.innerHTML = matches.map(s =>
-            `<div class="px-4 py-2.5 text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors" onclick="addSkillPill('${s.replace(/'/g, "\\\'")}'); document.getElementById('prof-skills-input').value=''; document.getElementById('skills-suggestions').classList.add('hidden');">${s}</div>`
-          ).join('');
-          skillsSuggestions.classList.remove('hidden');
-          skillsSuggestions.style.opacity = '1';
-          skillsSuggestions.style.transform = 'translateY(0)';
-        });
-
-        skillsInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            const val = skillsInput.value.replace(/,/g, '').trim();
-            if (val) {
-              addSkillPill(val);
-              skillsInput.value = '';
-              skillsSuggestions.classList.add('hidden');
-              skillsSuggestions.style.opacity = '0';
-            }
-          }
-        });
-
-        // Hide suggestions on outside click
-        document.addEventListener('click', (e) => {
-          if (!skillsContainer.contains(e.target)) {
-            skillsSuggestions.classList.add('hidden');
-            skillsSuggestions.style.opacity = '0';
-          }
-        });
-      }
-
-      // Make addSkillPill available globally for onclick handlers
-      window.addSkillPill = addSkillPill;
 
       // --- DRAG AND DROP SUPPORT ---
       const dropzone = document.querySelector(
@@ -3493,7 +3395,7 @@
           const skillsList = Array.isArray(parsed.skills)
             ? parsed.skills
             : String(parsed.skills).split(",");
-          skillsList.forEach((s) => addSkillPill(s));
+          skillsList.forEach((s) => addSkill(s.trim()));
         }
       }
 
