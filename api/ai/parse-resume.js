@@ -19,13 +19,14 @@ async function extractTextFromResume({ resumeText, resumeUrl }) {
   const lowerUrl = resumeUrl.toLowerCase().split('?')[0];
 
   if (contentType.includes('pdf') || lowerUrl.endsWith('.pdf')) {
-    const pdfLib = require('pdf-parse');
-    const pdfParse = typeof pdfLib === 'function' ? pdfLib : (pdfLib.PDFParse || pdfLib.default);
-    if (typeof pdfParse !== 'function') {
-      throw new Error('PDF parsing library could not be resolved as a function.');
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    try {
+      const result = await parser.getText();
+      return String(result.text || '').slice(0, 25000);
+    } finally {
+      await parser.destroy();
     }
-    const parsed = await pdfParse(buffer);
-    return String(parsed.text || '').slice(0, 25000);
   }
 
   if (contentType.includes('word') || lowerUrl.endsWith('.docx')) {
