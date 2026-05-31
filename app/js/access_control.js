@@ -61,7 +61,7 @@ const RESERVED_HOSTS = new Set([
     "candidate",
     "careers",
     "share",
-    "nextgenudaan",
+    "workcosmo",
     "www",
     "localhost",
     "127"
@@ -71,10 +71,10 @@ const RESERVED_HOSTS = new Set([
 const APEX_HOSTS = new Set([
     "anchan31.github.io",
     "www.anchan31.github.io",
-    "nextgenudaan.in",
-    "www.nextgenudaan.in",
-    "app.nextgenudaan.in",
-    "www.app.nextgenudaan.in"
+    "workcosmo.in",
+    "www.workcosmo.in",
+    "app.workcosmo.in",
+    "www.app.workcosmo.in"
 ]);
 
 const TENANT_QUERY_KEYS = ["companyId", "company", "cid", "clientId", "subdomain"];

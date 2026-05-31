@@ -1,5 +1,5 @@
 /**
- * NEXTGEN RECRUITMENT ECOSYSTEM - RBAC (aligned with subscription plans & team workflows)
+ * WORK COSMO RECRUITMENT ECOSYSTEM - RBAC (aligned with subscription plans & team workflows)
  */
 
 export const PERMISSIONS = {

@@ -191,7 +191,7 @@ async function payNow(planName, amount) {
             "key": "rzp_live_SqYugAybXREdik", // Live Public Key ID
             "amount": orderData.amount,
             "currency": orderData.currency,
-            "name": "NextgenUdaan",
+            "name": "Work Cosmo",
             "description": `Subscription for ${planName} Plan`,
             "image": "./src/images/favicon.png",
             "order_id": orderData.order_id,
@@ -338,7 +338,7 @@ async function processSubscription(userDetails) {
                         });
                         const provisionData = await provisionResponse.json();
                         if (provisionData.success) {
-                            alert(`🎉 Workspace Provisioned Successfully!\n\nSubdomain: ${provisionData.subdomain}.nextgenudaan.in/app\nEmail: ${provisionData.email}\nTemp Password: ${provisionData.tempPassword}\n\nPlease save these credentials!`);
+                            alert(`🎉 Workspace Provisioned Successfully!\n\nSubdomain: ${provisionData.subdomain}.workcosmo.in/app\nEmail: ${provisionData.email}\nTemp Password: ${provisionData.tempPassword}\n\nPlease save these credentials!`);
                         }
                     } catch (provErr) {
                         console.error('Auto-Provisioning Error:', provErr);

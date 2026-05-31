@@ -6442,10 +6442,10 @@ window.loadPortalSettings = async () => {
                                 </h4>
                                 <p class="text-sm text-slate-500 mt-1">Manage branding, visibility, and access for your public career page.</p>
                                 <div class="mt-3 flex items-center gap-3">
-                                    <a href="https://candidate.nextgenudaan.in" target="_blank" rel="noopener" class="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800 transition-all">
+                                    <a href="https://candidate.workcosmo.in" target="_blank" rel="noopener" class="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800 transition-all">
                                         <i class="fas fa-external-link-alt"></i> View Live Portal
                                     </a>
-                                    <span class="text-[10px] font-mono text-slate-400 opacity-70">candidate.nextgenudaan.in</span>
+                                    <span class="text-[10px] font-mono text-slate-400 opacity-70">candidate.workcosmo.in</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">

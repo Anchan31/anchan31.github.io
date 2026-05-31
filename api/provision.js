@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
 
   try {
     const companySlug = slugify(company) || `workspace-${Date.now()}`;
-    const tempPassword = "NextGen@2026!";
+    const tempPassword = "WorkCosmo@2026!";
     const plan = resolvePlan(planId);
 
     // 1. Create Firebase Auth User
