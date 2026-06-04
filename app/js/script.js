@@ -871,6 +871,13 @@ function applyResolvedTenantToLogin() {
     const queryTenant = getTenantFromQuery();
     const hostTenant = getTenantFromHost();
     const tenant = resolveTenantClientId({ includeSession: true, includeInput: false });
+    const host = window.location.hostname.toLowerCase();
+    const isHireHost = host === 'hire.workcosmo.in' || host === 'www.hire.workcosmo.in';
+
+    if (isHireHost && !tenant) {
+        window.location.replace('https://space.workcosmo.in');
+        return;
+    }
 
     if (queryTenant) {
         sessionStorage.setItem('tenant_client_id', queryTenant);

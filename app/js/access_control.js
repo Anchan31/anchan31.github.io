@@ -8,9 +8,14 @@ import {
     where
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { hasPermission, PERMISSIONS } from "./permissions.js";
+import { isModuleEnabled } from "../../shared/js/module_registry.js";
 
 export const FEATURES = {
     recruitModule: "recruitModule",
+    learnModule: "learnModule",
+    coreModule: "coreModule",
+    performModule: "performModule",
+    aiModule: "aiModule",
     careerPortal: "careerPortal",
     shareProfile: "shareProfile",
     qrBridgeLogin: "qrBridgeLogin",
@@ -57,10 +62,16 @@ const ACTIVE_STATUSES = new Set(["trialing", "active", "grace"]);
 const RESERVED_HOSTS = new Set([
     "anchan31",
     "access",
+    "ai",
     "app",
     "candidate",
     "careers",
+    "core",
+    "hire",
+    "learn",
+    "perform",
     "share",
+    "space",
     "workcosmo",
     "www",
     "localhost",
@@ -74,10 +85,36 @@ const APEX_HOSTS = new Set([
     "workcosmo.in",
     "www.workcosmo.in",
     "app.workcosmo.in",
-    "www.app.workcosmo.in"
+    "www.app.workcosmo.in",
+    "space.workcosmo.in",
+    "www.space.workcosmo.in",
+    "hire.workcosmo.in",
+    "www.hire.workcosmo.in",
+    "learn.workcosmo.in",
+    "www.learn.workcosmo.in",
+    "core.workcosmo.in",
+    "www.core.workcosmo.in",
+    "perform.workcosmo.in",
+    "www.perform.workcosmo.in",
+    "ai.workcosmo.in",
+    "www.ai.workcosmo.in"
 ]);
 
 const TENANT_QUERY_KEYS = ["companyId", "company", "cid", "clientId", "subdomain"];
+const PRODUCT_HOSTS = new Set(["hire", "learn", "core", "perform", "ai"]);
+const PATH_RESERVED_SEGMENTS = new Set([
+    "",
+    "app",
+    "api",
+    "assets",
+    "careers",
+    "css",
+    "index.html",
+    "js",
+    "share",
+    "space",
+    "src"
+]);
 
 const MODULE_PERMISSIONS = {
     [FEATURES.recruitModule]: [PERMISSIONS.fullAccess, PERMISSIONS.manageJobs, PERMISSIONS.manageCandidates, PERMISSIONS.readOnly],
@@ -116,6 +153,17 @@ export function getTenantFromHost() {
     return RESERVED_HOSTS.has(subdomain) ? "" : subdomain;
 }
 
+export function getTenantFromPath() {
+    const host = window.location.hostname.toLowerCase();
+    const firstHostLabel = normalizeClientId(host.split(".")[0] || "");
+    const isProductHost = PRODUCT_HOSTS.has(firstHostLabel);
+    const firstSegment = normalizeClientId(window.location.pathname.split("/").filter(Boolean)[0] || "");
+
+    if (!firstSegment || PATH_RESERVED_SEGMENTS.has(firstSegment)) return "";
+    if (isProductHost || host === "localhost" || host === "127.0.0.1") return firstSegment;
+    return "";
+}
+
 /**
  * Resolve workspace client ID: subdomain host, then URL params, then session/input.
  */
@@ -127,6 +175,9 @@ export function resolveTenantClientId(options = {}) {
 
     const fromQuery = getTenantFromQuery();
     if (fromQuery) return fromQuery;
+
+    const fromPath = getTenantFromPath();
+    if (fromPath) return fromPath;
 
     if (includeSession) {
         const stored = normalizeClientId(sessionStorage.getItem("tenant_client_id") || "");
@@ -247,6 +298,7 @@ export async function loadTenantAccess(db, clientId) {
 
 export function tenantHasFeature(company, subscription, featureKey) {
     if (!company || company.status !== "active" || !isSubscriptionUsable(subscription, company)) return false;
+    if (featureKey === FEATURES.recruitModule && !isModuleEnabled(company, "hire")) return false;
     return resolvePlanLimits(subscription, company).features.includes(featureKey);
 }
 

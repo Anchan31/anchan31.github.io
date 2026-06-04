@@ -1,5 +1,28 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "app.workcosmo.in"
+        }
+      ],
+      "destination": "https://space.workcosmo.in",
+      "permanent": false
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/:companyId",
+      "has": [
+        {
+          "type": "host",
+          "value": "hire.workcosmo.in"
+        }
+      ],
+      "destination": "/app/index.html"
+    },
     {
       "source": "/api/:path*",
       "destination": "/api/:path*"
