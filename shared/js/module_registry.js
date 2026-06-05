@@ -11,17 +11,6 @@ export const WORKCOSMO_MODULES = Object.freeze([
         status: "live"
     },
     {
-        key: "learn",
-        productName: "Workcosmo Learn",
-        shortName: "CosmoLearn",
-        label: "Learn",
-        description: "Learning paths, courses, assessments, and employee growth programs.",
-        icon: "fa-graduation-cap",
-        subdomain: "learn",
-        featureKey: "learnModule",
-        status: "planned"
-    },
-    {
         key: "core",
         productName: "Workcosmo Core",
         shortName: "CosmoCore",
@@ -41,17 +30,6 @@ export const WORKCOSMO_MODULES = Object.freeze([
         icon: "fa-chart-line",
         subdomain: "perform",
         featureKey: "performModule",
-        status: "planned"
-    },
-    {
-        key: "ai",
-        productName: "Workcosmo AI",
-        shortName: "CosmoAI",
-        label: "AI",
-        description: "AI screening, recommendations, insights, and automation across Workcosmo.",
-        icon: "fa-brain",
-        subdomain: "ai",
-        featureKey: "aiModule",
         status: "planned"
     }
 ]);
