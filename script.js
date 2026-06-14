@@ -1,12 +1,12 @@
 // Initialize Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyDKuFUJyHUl5AIFSFHCg-4S_wadsha6Et4",
-  authDomain: "recruitment-suite-hr.firebaseapp.com",
-  projectId: "recruitment-suite-hr",
-  storageBucket: "recruitment-suite-hr.firebasestorage.app",
-  messagingSenderId: "1049067446272",
-  appId: "1:1049067446272:web:a0eb4e5a9fac1589a8f8e5",
-  measurementId: "G-87FVXXYEP7"
+  apiKey: "AIzaSyA5EVkg2K1YoP65Ej3HBGgfHDBOOwnKbSs",
+  authDomain: "inworkcosmo.firebaseapp.com",
+  projectId: "inworkcosmo",
+  storageBucket: "inworkcosmo.firebasestorage.app",
+  messagingSenderId: "384225621712",
+  appId: "1:384225621712:web:5767b990f5b588a43350d5",
+  measurementId: "G-TJH9MJCZHC"
 };
 
 // Initialize Firebase
